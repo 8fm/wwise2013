@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WwiseDocument Type="WorkUnit" ID="{4A6B5F44-3921-40CE-8E88-60A3C51DE7BE}" SchemaVersion="62">
+	<SoundcasterSessions>
+		<WorkUnit Name="Minigun" ID="{4A6B5F44-3921-40CE-8E88-60A3C51DE7BE}" PersistMode="Standalone">
+			<ChildrenList>
+				<SoundcasterSession Name="Minigun_01" ID="{1C5BA931-9550-4DC8-B1C7-13689B8AE813}">
+					<ModuleList>
+						<Module>
+							<ObjectRef Name="Play_Minigun" ID="{2B98695B-2238-45B1-89C5-A5B826472425}" WorkUnitID="{ED23F4DA-DCE5-4423-887B-E01272D6C483}" />
+							<Position X="0" Y="0" />
+						</Module>
+						<Module>
+							<ObjectRef Name="Stop_Minigun" ID="{CBA334AA-6BC1-4847-854B-A9B55D1571FE}" WorkUnitID="{ED23F4DA-DCE5-4423-887B-E01272D6C483}" />
+							<Position X="1" Y="0" />
+						</Module>
+					</ModuleList>
+					<RTPCValueList ShowAll="true">
+						<RTPCValue>
+							<GameParameterRef Name="RPM" ID="{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}" />
+							<Value>4000</Value>
+						</RTPCValue>
+						<RTPCValue>
+							<GameParameterRef Name="Stealth_Factor" ID="{B784B340-F048-4EA8-BDE8-6F4066F82CD1}" />
+							<Value>50</Value>
+						</RTPCValue>
+						<RTPCValue>
+							<GameParameterRef Name="Engine_Load" ID="{EB92D28A-BB63-4332-8166-0AC95BAD9EFE}" />
+							<Value>0</Value>
+						</RTPCValue>
+						<RTPCValue>
+							<GameParameterRef Name="Rain_Intensity" ID="{CA0B90AA-8A1F-43AE-ACDD-387803814573}" />
+							<Value>50</Value>
+						</RTPCValue>
+						<RTPCValue>
+							<GameParameterRef Name="Time" ID="{BB9274CE-1A7C-4293-BD7F-B18D55577696}" />
+							<Value>120</Value>
+						</RTPCValue>
+					</RTPCValueList>
+					<CurrentStateList ShowAll="true">
+						<CurrentStateRef Name="InGame" ID="{7C400264-0402-4E47-930D-960FBDD8605B}" />
+						<CurrentStateRef Name="a_Stealth" ID="{43C6702F-3A30-4D5C-B16D-C862BE5989EF}" />
+					</CurrentStateList>
+					<CurrentSwitchList ShowAll="true">
+						<CurrentSwitchRef Name="Concrete" ID="{BC91E14D-8394-4D2A-98A2-B7A963C00954}" />
+						<CurrentSwitchRef Name="Crouching" ID="{64E633E6-BB40-41C9-A36D-13C35B7CDF83}" />
+					</CurrentSwitchList>
+				</SoundcasterSession>
+			</ChildrenList>
+		</WorkUnit>
+	</SoundcasterSessions>
+</WwiseDocument>

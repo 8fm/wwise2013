@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WwiseDocument Type="WorkUnit" ID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}" SchemaVersion="62">
+	<Busses>
+		<WorkUnit Name="Default Work Unit" ID="{A74EEB4A-0805-4AFA-969C-53DCB862B550}" PersistMode="Standalone">
+			<ChildrenList>
+				<Bus Name="Master Audio Bus" ID="{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}">
+					<PropertyList>
+						<Property Name="EnableWiiCompressor" Type="bool" Value="True" />
+					</PropertyList>
+					<ChildrenList>
+						<Bus Name="Environmental" ID="{8CF94195-E210-4967-89DB-CA103B48A267}">
+							<ChildrenList>
+								<Bus Name="Migrated" ID="{2883BD4F-E41F-4219-87C4-D83655D8F807}">
+									<ChildrenList>
+										<AuxBus Name="Bright_Small_Hall_Env" ID="{9B518943-213A-4E65-8B0F-99440709822A}">
+											<EffectInfo>
+												<EffectRef Name="Bright_Small_Hall_Env" ID="{4D11F2B7-6057-4887-A725-F00E1629699E}" CompanyID="0" Index="0" Platform="Linked" PluginID="118" PluginName="Wwise RoomVerb" />
+											</EffectInfo>
+										</AuxBus>
+										<AuxBus Name="Claustro_Inside_Your_Head_Env" ID="{8F4E5EEA-5348-4056-9D19-7ABA8E7FE914}">
+											<EffectInfo>
+												<EffectRef Name="Claustro_Inside_Your_Head_Env" ID="{FDDCC998-C5B5-49F6-B711-E85DA0B70BFE}" CompanyID="0" Index="0" Platform="Linked" PluginID="118" PluginName="Wwise RoomVerb" />
+											</EffectInfo>
+										</AuxBus>
+										<AuxBus Name="Claustro_Robotic_Trash_Env" ID="{0BDF1EAB-F4B9-431E-9DE2-A46FBD3C6CC0}">
+											<EffectInfo>
+												<EffectRef Name="Claustro_Robotic_Trash_Env" ID="{180947BF-CB6D-4108-98DB-B1E7A90F524F}" CompanyID="0" Index="0" Platform="Linked" PluginID="118" PluginName="Wwise RoomVerb" />
+											</EffectInfo>
+										</AuxBus>
+										<AuxBus Name="Huge_Space_Dreaming_Env" ID="{4E21BEE5-5E4F-4647-B986-84C555D1AABF}">
+											<EffectInfo>
+												<EffectRef Name="Huge_Space_Dreaming_Env" ID="{3D88A07A-6F0C-4CFF-A140-4BC62F9D2661}" CompanyID="0" Index="0" Platform="Linked" PluginID="118" PluginName="Wwise RoomVerb" />
+											</EffectInfo>
+										</AuxBus>
+										<AuxBus Name="Bathroom1" ID="{06477322-CC3F-4A47-A4DA-69D9F7C63041}">
+											<EffectInfo>
+												<EffectRef Name="Bathroom1" ID="{1969D30F-C165-45C0-B290-DE3ED07A7AA3}" CompanyID="0" Index="0" Platform="Linked" PluginID="115" PluginName="Wwise Matrix Reverb" />
+											</EffectInfo>
+										</AuxBus>
+										<AuxBus Name="Big_Garage1" ID="{72A6017F-3285-46F0-A656-C6E1001A3968}">
+											<EffectInfo>
+												<EffectRef Name="Big_Garage1" ID="{172402A8-22F4-40FC-BE1D-5269594CB633}" CompanyID="0" Index="0" Platform="Linked" PluginID="115" PluginName="Wwise Matrix Reverb" />
+											</EffectInfo>
+										</AuxBus>
+										<AuxBus Name="Large_Bright_Chamber1" ID="{D2064AC8-374C-4FCD-A5DE-F20742C1DE87}">
+											<EffectInfo>
+												<EffectRef Name="Large_Bright_Chamber1" ID="{0BFA2291-5716-4759-AC24-F59D29E8F2E4}" CompanyID="0" Index="0" Platform="Linked" PluginID="115" PluginName="Wwise Matrix Reverb" />
+											</EffectInfo>
+										</AuxBus>
+										<AuxBus Name="Large_Church1" ID="{45A87270-B5C8-4FF0-9607-66451FBDC83F}">
+											<EffectInfo>
+												<EffectRef Name="Large_Church1" ID="{9B6E8B78-EF8C-494C-AADA-D01CF51B5FAC}" CompanyID="0" Index="0" Platform="Linked" PluginID="115" PluginName="Wwise Matrix Reverb" />
+											</EffectInfo>
+										</AuxBus>
+										<AuxBus Name="Medium_Room1" ID="{34BB848B-C6F7-4F9C-BE09-A2B4CA89BF8D}">
+											<EffectInfo>
+												<EffectRef Name="Medium_Room1" ID="{71B802A7-03E2-4998-B241-B2B84FE9DDFF}" CompanyID="0" Index="0" Platform="Linked" PluginID="115" PluginName="Wwise Matrix Reverb" />
+											</EffectInfo>
+										</AuxBus>
+										<AuxBus Name="PA_Announcement1" ID="{2FAF4BCE-C3D5-4B3F-891A-48FA66ABF9D2}">
+											<EffectInfo>
+												<EffectRef Name="PA_Announcement1" ID="{65E0ACE4-B404-4485-87A4-5907277D9858}" CompanyID="0" Index="0" Platform="Linked" PluginID="115" PluginName="Wwise Matrix Reverb" />
+											</EffectInfo>
+										</AuxBus>
+										<AuxBus Name="Small_Tiled_Room1" ID="{ECD24C24-8812-4BBA-B950-51EC274B7024}">
+											<EffectInfo>
+												<EffectRef Name="Small_Tiled_Room1" ID="{41EEE722-3009-4B3F-8820-F414623783E3}" CompanyID="0" Index="0" Platform="Linked" PluginID="115" PluginName="Wwise Matrix Reverb" />
+											</EffectInfo>
+										</AuxBus>
+										<AuxBus Name="Small_Wooden_Room1" ID="{6CBE907D-AB38-42E5-9E86-310E51F5BE6D}">
+											<EffectInfo>
+												<EffectRef Name="Small_Wooden_Room1" ID="{F7CBE859-36A8-4174-B553-AE32A7FE95FA}" CompanyID="0" Index="0" Platform="Linked" PluginID="115" PluginName="Wwise Matrix Reverb" />
+											</EffectInfo>
+										</AuxBus>
+										<AuxBus Name="Tunnel1" ID="{E67852C2-F872-4707-BFA8-523DCD276CE9}">
+											<EffectInfo>
+												<EffectRef Name="Tunnel1" ID="{CC44B890-9865-4157-965F-86FED27BC4C6}" CompanyID="0" Index="0" Platform="Linked" PluginID="115" PluginName="Wwise Matrix Reverb" />
+											</EffectInfo>
+										</AuxBus>
+										<AuxBus Name="Underground_Parking1" ID="{1F6E05DA-5206-47E8-B3A8-738504F235EC}">
+											<EffectInfo>
+												<EffectRef Name="Underground_Parking1" ID="{8DA66AA3-6CA0-41A0-B7A2-BB6FCABFCDA8}" CompanyID="0" Index="0" Platform="Linked" PluginID="115" PluginName="Wwise Matrix Reverb" />
+											</EffectInfo>
+										</AuxBus>
+									</ChildrenList>
+								</Bus>
+								<Bus Name="SFX" ID="{ED2BCAC8-D7B6-4448-8900-439B557894F4}">
+									<ChildrenList>
+										<Bus Name="Guns" ID="{06362E8D-5A32-497A-B063-3DA95963CE47}" />
+										<Bus Name="Cars" ID="{33329D23-BCDD-4D1A-9734-2403A3428FAE}" />
+									</ChildrenList>
+								</Bus>
+							</ChildrenList>
+						</Bus>
+						<Bus Name="Non-Enviromental" ID="{DF1B89FC-800F-4297-B3A8-48F344686A70}">
+							<ChildrenList>
+								<Bus Name="Ambience" ID="{2C5FE1AB-B90C-44C9-8760-CF255A4C9B62}">
+									<ChildrenList>
+										<Bus Name="Traffic" ID="{58AC2BFA-6F05-445E-9641-0EE6CD344546}" />
+										<Bus Name="Rain" ID="{B8684325-AA72-4E52-A21D-7B93CD110885}" />
+										<Bus Name="Tone" ID="{245E6E17-190D-41B6-851E-B20FEFAC0E69}" />
+										<Bus Name="Passby" ID="{38616D30-91D6-457D-B144-C66EE8EF1A16}" />
+										<Bus Name="Horns" ID="{A281E6FF-989C-4096-8B2A-3D7122638A9E}" />
+										<Bus Name="Walla" ID="{3A3CF996-414B-41F6-A737-74B497DC23F2}" />
+										<Bus Name="Animals" ID="{36563C91-5C08-4656-9A3E-D7845E8F57F5}" />
+									</ChildrenList>
+								</Bus>
+								<Bus Name="Music" ID="{65FD6DA1-DA72-4D4E-85B0-DD6BC3164A66}">
+									<PropertyList>
+										<Property Name="UsedForBackgroundMusic" Type="bool" Value="True" />
+									</PropertyList>
+									<ChildrenList>
+										<Bus Name="Drums" ID="{4E7D5F72-D555-4695-B95B-F7262B7D0AEC}" />
+										<Bus Name="Ambiant" ID="{66E754BD-8A7C-41F6-8D6A-76AFEDFD0DF9}" />
+										<Bus Name="Bass" ID="{F6C22F0E-9C78-44E1-9D3C-AB65FC28753C}" />
+										<Bus Name="Melodic" ID="{F2B2C51A-98BA-4BCA-B92F-EAE18D5FC883}" />
+										<Bus Name="00_Fight" ID="{98FDF708-F2E5-43DA-811D-96A211C4434E}" />
+										<Bus Name="01_Theme" ID="{94A28613-708F-4627-B062-8391EA73BC65}">
+											<PropertyList>
+												<Property Name="RecoveryTime" Type="Real64" Value="0" />
+											</PropertyList>
+											<DuckingList>
+												<DuckItem>
+													<BusRef Name="00_Fight" ID="{98FDF708-F2E5-43DA-811D-96A211C4434E}" />
+													<DuckingParam>
+														<Volume>-10</Volume>
+														<FadeInTime>0.5</FadeInTime>
+														<FadeOutTime>0.5</FadeOutTime>
+														<FadeCurve>FadeLinear</FadeCurve>
+														<TargetProp>BusVolume</TargetProp>
+													</DuckingParam>
+												</DuckItem>
+											</DuckingList>
+										</Bus>
+									</ChildrenList>
+								</Bus>
+								<Bus Name="Voices_Radio" ID="{6A72B5A8-4832-47D6-84B1-24A69F64A2EB}">
+									<PropertyList>
+										<Property Name="RecoveryTime" Type="Real64" Value="0.2" />
+									</PropertyList>
+									<DuckingList>
+										<DuckItem>
+											<BusRef Name="Music" ID="{65FD6DA1-DA72-4D4E-85B0-DD6BC3164A66}" />
+											<DuckingParam>
+												<Volume>-6</Volume>
+												<FadeInTime>0.5</FadeInTime>
+												<FadeOutTime>0.5</FadeOutTime>
+												<FadeCurve>FadeLinear</FadeCurve>
+												<TargetProp>BusVolume</TargetProp>
+											</DuckingParam>
+										</DuckItem>
+										<DuckItem>
+											<BusRef Name="Ambience" ID="{2C5FE1AB-B90C-44C9-8760-CF255A4C9B62}" />
+											<DuckingParam>
+												<Volume>-3</Volume>
+												<FadeInTime>0.5</FadeInTime>
+												<FadeOutTime>0.5</FadeOutTime>
+												<FadeCurve>FadeLinear</FadeCurve>
+												<TargetProp>BusVolume</TargetProp>
+											</DuckingParam>
+										</DuckItem>
+									</DuckingList>
+								</Bus>
+								<Bus Name="SS_Impact" ID="{12203D01-D86F-4EE6-B5A4-F3DF1527E343}" />
+							</ChildrenList>
+						</Bus>
+					</ChildrenList>
+					<EffectInfo>
+						<EffectRef Name="Main_Comp" ID="{30EA6178-03D0-47F6-8C53-A5BF08F1082E}" CompanyID="0" Index="0" Platform="Linked" PluginID="110" PluginName="Wwise Peak Limiter" />
+					</EffectInfo>
+				</Bus>
+				<MotionBus Name="Master Motion Bus" ID="{20A630BA-3398-4676-B927-1004DFE41FD8}" />
+				<Bus Name="Master Secondary Bus" ID="{D2E0BC7E-7B3F-4FFE-A670-FAE02761B631}">
+					<PropertyList>
+						<Property Name="MaxDuckVolume" Type="Real64" Value="-96" />
+					</PropertyList>
+				</Bus>
+			</ChildrenList>
+		</WorkUnit>
+	</Busses>
+</WwiseDocument>

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WwiseDocument Type="WorkUnit" ID="{ED23F4DA-DCE5-4423-887B-E01272D6C483}" SchemaVersion="62">
+	<Events>
+		<WorkUnit Name="Minigun" ID="{ED23F4DA-DCE5-4423-887B-E01272D6C483}" PersistMode="Standalone">
+			<ChildrenList>
+				<Event Name="Play_Minigun" ID="{2B98695B-2238-45B1-89C5-A5B826472425}">
+					<ChildrenList>
+						<Action Name="Play" ID="{81524933-EE47-4F74-8965-472172F06D33}" ShortID="548583267" Type="Play" Scope="One" Global="false">
+							<ElementList>
+								<Element ID="{DD22B00E-BB0E-461B-8412-BC98F877E39E}" Global="false">
+									<ObjectRef Name="Minigun_Barrel_Start" ID="{8C0FD1AD-E45D-408D-9BF3-874970CCC123}" WorkUnitID="{C15C1E1F-823E-42FF-B836-EEE952212586}" />
+								</Element>
+							</ElementList>
+						</Action>
+						<Action Name="Play" ID="{C3C412A6-95BB-416C-95DE-DBA385792434}" ShortID="950254304" Type="Play" Scope="One" Global="false">
+							<PropertyList>
+								<Property Name="Delay" Type="Real64" Value="0.9" />
+							</PropertyList>
+							<ElementList>
+								<Element ID="{8639B8FE-3742-45CE-893D-710DA8E24A64}" Global="false">
+									<ObjectRef Name="Fire" ID="{7088E07A-906D-446B-9874-CD17F803B681}" WorkUnitID="{C15C1E1F-823E-42FF-B836-EEE952212586}" />
+								</Element>
+							</ElementList>
+						</Action>
+						<Action Name="Play" ID="{0989D9F1-FA3F-4146-ABB3-C8159D9224C7}" ShortID="542956130" Type="Play" Scope="One" Global="false">
+							<PropertyList>
+								<Property Name="Delay" Type="Real64" Value="0.9" />
+							</PropertyList>
+							<ElementList>
+								<Element ID="{376078C3-5EAF-4C7A-8823-0946219F593F}" Global="false">
+									<ObjectRef Name="Fire_Sub" ID="{51AAC0A5-7ED8-4DAC-AEA7-8901CEAAC489}" WorkUnitID="{C15C1E1F-823E-42FF-B836-EEE952212586}" />
+								</Element>
+							</ElementList>
+						</Action>
+						<Action Name="Play" ID="{2697DD8F-D0C9-4343-A14F-1B64F4EFD948}" ShortID="405366939" Type="Play" Scope="One" Global="false">
+							<PropertyList>
+								<Property Name="Delay" Type="Real64" Value="1.2" />
+							</PropertyList>
+							<ElementList>
+								<Element ID="{2FDC5159-0ACF-4D3D-AE17-5817790483A1}" Global="false">
+									<ObjectRef Name="Shells" ID="{8A261B8F-89AA-490E-A62A-2551D87F3E56}" WorkUnitID="{C15C1E1F-823E-42FF-B836-EEE952212586}" />
+								</Element>
+							</ElementList>
+						</Action>
+					</ChildrenList>
+				</Event>
+				<Event Name="Stop_Minigun" ID="{CBA334AA-6BC1-4847-854B-A9B55D1571FE}">
+					<ChildrenList>
+						<Action Name="Play" ID="{E41114BF-B1DD-4BC6-82C3-9D499B3CB31C}" ShortID="378120700" Type="Play" Scope="One" Global="false">
+							<PropertyList>
+								<Property Name="FadeCurve" Type="int16" Value="0" />
+								<Property Name="FadeTime" Type="Real64" Value="0.1" />
+							</PropertyList>
+							<ElementList>
+								<Element ID="{BF10007C-87F4-4F75-B9FA-61175EA7B748}" Global="false">
+									<ObjectRef Name="Minigun_Barrel_Stop" ID="{E49E4A98-D739-40FA-832D-E36509699D48}" WorkUnitID="{C15C1E1F-823E-42FF-B836-EEE952212586}" />
+								</Element>
+							</ElementList>
+						</Action>
+						<Action Name="Stop" ID="{801D1611-00C2-4C1E-929E-7FA44F078496}" ShortID="87309462" Type="Stop" Scope="One" Global="false">
+							<PropertyList>
+								<Property Name="FadeTime" Type="Real64" Value="0.2" />
+							</PropertyList>
+							<ElementList>
+								<Element ID="{8F732BAF-FE33-42F1-A7E9-C930F8B5B247}" Global="false">
+									<ObjectRef Name="Minigun_Barrel_Start" ID="{8C0FD1AD-E45D-408D-9BF3-874970CCC123}" WorkUnitID="{C15C1E1F-823E-42FF-B836-EEE952212586}" />
+								</Element>
+							</ElementList>
+						</Action>
+						<Action Name="Break" ID="{A8582CCB-DBAE-4E40-B72A-E3FA4B51F301}" ShortID="993438191" Type="Break" Scope="One" Global="false">
+							<ElementList>
+								<Element ID="{D377C92A-091B-4066-8BA4-CD871CE11570}" Global="false">
+									<ObjectRef Name="Fire" ID="{7088E07A-906D-446B-9874-CD17F803B681}" WorkUnitID="{C15C1E1F-823E-42FF-B836-EEE952212586}" />
+								</Element>
+							</ElementList>
+						</Action>
+						<Action Name="Break" ID="{B72F8077-1373-4A24-97F2-BA6A06229C74}" ShortID="603362669" Type="Break" Scope="One" Global="false">
+							<ElementList>
+								<Element ID="{4A4DACFC-CEA8-470F-91D9-38EE76229F9A}" Global="false">
+									<ObjectRef Name="Fire_Sub" ID="{51AAC0A5-7ED8-4DAC-AEA7-8901CEAAC489}" WorkUnitID="{C15C1E1F-823E-42FF-B836-EEE952212586}" />
+								</Element>
+							</ElementList>
+						</Action>
+						<Action Name="Break" ID="{F1EE7D3A-A9F1-477A-BC4E-F883A859CD5B}" ShortID="770034625" Type="Break" Scope="One" Global="false">
+							<PropertyList>
+								<Property Name="Delay" Type="Real64" Value="1.4" />
+							</PropertyList>
+							<ElementList>
+								<Element ID="{615F187A-F6D8-4675-9073-D862D36DE6D2}" Global="false">
+									<ObjectRef Name="Shells" ID="{8A261B8F-89AA-490E-A62A-2551D87F3E56}" WorkUnitID="{C15C1E1F-823E-42FF-B836-EEE952212586}" />
+								</Element>
+							</ElementList>
+						</Action>
+					</ChildrenList>
+				</Event>
+			</ChildrenList>
+		</WorkUnit>
+	</Events>
+</WwiseDocument>

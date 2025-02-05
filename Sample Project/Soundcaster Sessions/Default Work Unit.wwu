@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WwiseDocument Type="WorkUnit" ID="{8C516E3C-23AA-4358-ACBF-2C79E9DF888C}" SchemaVersion="62">
+	<SoundcasterSessions>
+		<WorkUnit Name="Default Work Unit" ID="{8C516E3C-23AA-4358-ACBF-2C79E9DF888C}" PersistMode="Standalone">
+			<ChildrenList>
+				<SoundcasterSession Name="General" ID="{5518726B-53A4-4D09-B858-BB7D4BB8AF33}">
+					<ModuleList>
+						<Module>
+							<ObjectRef Name="Play_Music" ID="{FF59687C-48CF-4385-B1C5-CE84B0A63880}" WorkUnitID="{6F05D4CF-BAF2-4B93-B538-B1D3F38781D9}" />
+							<Position X="0" Y="0" />
+						</Module>
+						<Module>
+							<ObjectRef Name="Play_Footstep" ID="{1AF4A3BA-682A-4664-AC31-45C0F0E6F8D1}" WorkUnitID="{75E16B76-216B-4F19-B412-842B3C3DA8B4}" />
+							<Position X="0" Y="1" />
+						</Module>
+						<Module>
+							<ObjectRef Name="Play_24h_New_York_City_Ambience" ID="{2E97B23B-9254-4260-AC1D-8D065CE6E43F}" WorkUnitID="{381C71E6-5E71-4863-AC34-2949A7846ABA}" />
+							<Position X="1" Y="0" />
+						</Module>
+						<Module>
+							<ObjectRef Name="Stop_24h_New_York_City_Ambience" ID="{B54E3C05-4B46-4FA4-9577-66B19EAAB1A1}" WorkUnitID="{381C71E6-5E71-4863-AC34-2949A7846ABA}" />
+							<Position X="1" Y="1" />
+						</Module>
+						<Module>
+							<ObjectRef Name="Play_Minigun" ID="{2B98695B-2238-45B1-89C5-A5B826472425}" WorkUnitID="{ED23F4DA-DCE5-4423-887B-E01272D6C483}" />
+							<Position X="2" Y="0" />
+						</Module>
+						<Module>
+							<ObjectRef Name="Stop_Minigun" ID="{CBA334AA-6BC1-4847-854B-A9B55D1571FE}" WorkUnitID="{ED23F4DA-DCE5-4423-887B-E01272D6C483}" />
+							<Position X="2" Y="1" />
+						</Module>
+						<Module>
+							<ObjectRef Name="Play_Porsche_911" ID="{3B76BD3D-0970-4AFE-A343-8023ABBFB660}" WorkUnitID="{E1630F87-752D-43D7-8F08-83FE1A8FF934}" />
+							<Position X="3" Y="0" />
+						</Module>
+						<Module>
+							<ObjectRef Name="Stop_Porsche_911" ID="{A221AA77-493A-4B8C-902A-4E5237E26260}" WorkUnitID="{E1630F87-752D-43D7-8F08-83FE1A8FF934}" />
+							<Position X="3" Y="1" />
+						</Module>
+					</ModuleList>
+					<RTPCValueList ShowAll="true">
+						<RTPCValue>
+							<GameParameterRef Name="RPM" ID="{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}" />
+							<Value>4000</Value>
+						</RTPCValue>
+						<RTPCValue>
+							<GameParameterRef Name="Stealth_Factor" ID="{B784B340-F048-4EA8-BDE8-6F4066F82CD1}" />
+							<Value>50</Value>
+						</RTPCValue>
+						<RTPCValue>
+							<GameParameterRef Name="Engine_Load" ID="{EB92D28A-BB63-4332-8166-0AC95BAD9EFE}" />
+							<Value>0</Value>
+						</RTPCValue>
+						<RTPCValue>
+							<GameParameterRef Name="Rain_Intensity" ID="{CA0B90AA-8A1F-43AE-ACDD-387803814573}" />
+							<Value>50</Value>
+						</RTPCValue>
+						<RTPCValue>
+							<GameParameterRef Name="Time" ID="{BB9274CE-1A7C-4293-BD7F-B18D55577696}" />
+							<Value>120</Value>
+						</RTPCValue>
+					</RTPCValueList>
+					<CurrentStateList ShowAll="true">
+						<CurrentStateRef Name="None" ID="{7993CD7C-BBA7-4A63-9E5A-4003C1B86F3C}" />
+						<CurrentStateRef Name="None" ID="{4BA09D62-D59B-4880-A78C-8BECE7D7899F}" />
+					</CurrentStateList>
+					<CurrentSwitchList ShowAll="true">
+						<CurrentSwitchRef Name="Concrete" ID="{BC91E14D-8394-4D2A-98A2-B7A963C00954}" />
+						<CurrentSwitchRef Name="Crouching" ID="{64E633E6-BB40-41C9-A36D-13C35B7CDF83}" />
+					</CurrentSwitchList>
+				</SoundcasterSession>
+			</ChildrenList>
+		</WorkUnit>
+	</SoundcasterSessions>
+</WwiseDocument>
