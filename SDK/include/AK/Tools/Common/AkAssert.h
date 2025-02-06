@@ -7,29 +7,34 @@
 #ifndef _AK_AKASSERT_H_
 #define _AK_AKASSERT_H_
 
+#if defined( _DEBUG ) && !(defined AK_DISABLE_ASSERTS)
+	#ifndef AK_ENABLE_ASSERTS
+		#define AK_ENABLE_ASSERTS
+	#endif
+#endif
+
 #if ! defined( AKASSERT )
 
 	#include <AK/SoundEngine/Common/AkTypes.h> //For AK_Fail/Success
-	#include <assert.h>
 	#include <AK/SoundEngine/Common/AkSoundEngineExport.h>
 
-	#if ! defined ( VERIFY )
-		#define VERIFY(x)	((void)(x))
-	#endif
-
-	#if defined( _DEBUG )
+	#if defined( AK_ENABLE_ASSERTS )
 
 		#if defined( __SPU__ )
 
-			// Note: No assert hook on SPU
-			#include "spu_printf.h"
-			#include "libsn_spu.h"
-			#define AKASSERT(Condition)																\
-				if ( !(Condition) )																	\
-				{																					\
-					spu_printf( "Assertion triggered in file %s at line %d\n", __FILE__, __LINE__ );\
-					/*snPause();*/																	\
-				}																	
+			#if defined ( _DEBUG )
+				// Note: No assert hook on SPU
+				#include "spu_printf.h"
+				#include "libsn_spu.h"
+				#define AKASSERT(Condition)																\
+					if ( !(Condition) )																	\
+					{																					\
+						spu_printf( "Assertion triggered in file %s at line %d\n", __FILE__, __LINE__ );\
+						/*snPause();*/																	\
+					}																	
+			#else
+				#define AKASSERT(Condition)
+			#endif
 
 		#else // defined( __SPU__ )
 
@@ -44,87 +49,20 @@
 
 			extern AKSOUNDENGINE_API AkAssertHook g_pAssertHook;
 
-			#if defined( AK_WII_FAMILY )
+			// These platforms use a built-in g_pAssertHook (and do not fall back to the regular assert macro)
+			#if defined( AK_APPLE ) || defined( AK_ANDROID ) || defined( AK_WII_FAMILY )
 
-					inline void _AkAssertHook(
-									bool bcondition,
-									const char * in_pszExpression,
-									const char * in_pszFileName,
-									int in_lineNumber
-									)
-					{
-						if( !bcondition )
-							g_pAssertHook( in_pszExpression, in_pszFileName, in_lineNumber);
-					}
+				#define AKASSERT(Condition) ((Condition) ? ((void) 0) : g_pAssertHook( #Condition, __FILE__, __LINE__) )
 
-					#define AKASSERT(Condition) if ( g_pAssertHook )   \
-													_AkAssertHook((bool)(Condition), #Condition, __FILE__, __LINE__); \
-												else                                \
-												{ \
-													if (!(bool)(Condition)) \
-													{ \
-														OSHalt(#Condition); \
-													} \
-												}
-			#elif defined( AK_APPLE )
-					#include <TargetConditionals.h>
-					
-					#if TARGET_OS_IPHONE && TARGET_IPHONE_SIMULATOR
-						#define CallDebugger asm("int3");
-					#elif TARGET_OS_IPHONE
-						#define CallDebugger asm("trap");
-					#else
-						#define CallDebugger pthread_kill (pthread_self(), SIGTRAP);
-					#endif
-
-					inline void _MacAssert( const char * in_pFunc , const char * in_pFile , unsigned in_LineNum, const char * in_pCondition )
-					{
-						printf ("%s:%u:%s failed assertion `%s'\n", in_pFile, in_LineNum, in_pFunc, in_pCondition);
-						CallDebugger
-					}
-
-					#define _AkAssertHook(_Expression) ( (_Expression) || (g_pAssertHook( #_Expression, __FILE__, __LINE__), 0) )
-
-					#define AKASSERT(Condition) if ( g_pAssertHook )   \
-												_AkAssertHook(Condition);          \
-					else                                \
-												(__builtin_expect(!(Condition), 0) ? _MacAssert(__func__, __FILE__, __LINE__, #Condition) : (void)0)	
-
-			#elif defined( AK_VITA )
-				
-				#define _AkAssertHook(_Expression) ( (_Expression) || (g_pAssertHook( #_Expression, __FILE__, __LINE__), 0) )
-
-				#define AKASSERT(Condition)			\
-					_Pragma( "diag_push" )			\
-					_Pragma( "diag_suppress=237" )	\
-					_Pragma( "diag_suppress=112" )	\
-					if ( g_pAssertHook )			\
-						_AkAssertHook(Condition);	\
-					else							\
-						assert(Condition);			\
-					_Pragma( "diag_pop" )
-
-			#elif defined( AK_ANDROID )
-				#include <android/log.h>
-				inline void _AndroidAssert( const char * in_pFunc , const char * in_pFile , unsigned in_LineNum, const char * in_pCondition )
-				{
-					__android_log_print(ANDROID_LOG_INFO, "AKASSERT","%s:%u:%s failed assertion `%s'\n", in_pFile, in_LineNum, in_pFunc, in_pCondition);
-				}
-				
-				#define _AkAssertHook(_Expression) ( (_Expression) || (g_pAssertHook( #_Expression, __FILE__, __LINE__), 0) )
-
-
-				#define AKASSERT(Condition) if ( g_pAssertHook )   \
-												_AkAssertHook(Condition);          \
-											else \
-												(__builtin_expect(!(Condition), 0) ? _AndroidAssert(__func__, __FILE__, __LINE__, #Condition) : (void)0)
 			#else
 				
-				#define _AkAssertHook(_Expression) ( (_Expression) || (g_pAssertHook( #_Expression, __FILE__, __LINE__), 0) )
+				#include <assert.h>
 
-				#define AKASSERT(Condition) if ( g_pAssertHook )   \
-												_AkAssertHook(Condition);          \
-											else                                \
+				#define _AkAssertHook(_Expression) (void)( (_Expression) || (g_pAssertHook( #_Expression, __FILE__, __LINE__), 0) )
+
+				#define AKASSERT(Condition) if ( g_pAssertHook )          \
+												_AkAssertHook(Condition); \
+											else                          \
 												assert(Condition)
 
 			#endif // defined( AK_WII )
@@ -133,12 +71,19 @@
 
 		#define AKVERIFY AKASSERT
 
-	#else // defined( _DEBUG )
+		#ifdef _DEBUG
+			#define AKASSERTD AKASSERT
+		#else
+			#define AKASSERTD(Condition) ((void)0)
+		#endif
+
+	#else //  defined( AK_ENABLE_ASSERTS )
 
 		#define AKASSERT(Condition) ((void)0)
+		#define AKASSERTD(Condition) ((void)0)
 		#define AKVERIFY(x) ((void)(x))
 
-	#endif // defined( _DEBUG )
+	#endif //  defined( AK_ENABLE_ASSERTS )
 
 	#define AKASSERT_RANGE(Value, Min, Max) (AKASSERT(((Value) >= (Min)) && ((Value) <= (Max))))
 

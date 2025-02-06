@@ -262,14 +262,14 @@ namespace AK
 				CreateToneSource,
 				CreateToneSourceParams ) );
 
-#if defined( AK_WIN ) && !defined( AK_USE_METRO_API )
+/*#if defined( AK_WIN ) && !defined( AK_USE_METRO_API )
 			AK_CHECK_ERROR( AK::SoundEngine::RegisterPlugin( 
 				AkPluginTypeSource, 
 				AKCOMPANYID_AUDIOKINETIC, 
 				AKSOURCEID_MP3,
 				CreateMP3Source,
 				CreateMP3SourceParams ) );
-#endif
+#endif*/
 
 #if !defined( AK_VITA ) && !defined( AK_3DS )
 			AK_CHECK_ERROR( AK::SoundEngine::RegisterPlugin(
@@ -329,7 +329,7 @@ namespace AK
 		static AKRESULT RegisterAstoundSoundPlugins()
 		{
 			AKRESULT eFinal = AK_Success;
-#if ( defined( AK_WIN ) && !defined( AK_USE_METRO_API ) ) || defined( AK_PS4 ) || defined( AK_XBOXONE ) || defined( AK_ANDROID ) || defined( AK_IOS ) || defined( AK_MAC_OS_X )
+#if ( defined( AK_WIN ) && !defined( AK_USE_METRO_API ) ) || defined( AK_PS4 ) || defined( AK_XBOXONE ) || defined( AK_ANDROID ) || defined( AK_IOS )
 			
 			AK_CHECK_ERROR( AK::SoundEngine::RegisterPlugin( 
 				AkPluginTypeEffect, 
