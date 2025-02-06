@@ -8,12 +8,12 @@
 			<InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
 			<IntrinsicFunctions>true</IntrinsicFunctions>
 			<OmitFramePointers>false</OmitFramePointers>
-			<PreprocessorDefinitions>NDEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;_CRT_SECURE_NO_DEPRECATE;_CRT_NON_CONFORMING_SWPRINTFS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+			<PreprocessorDefinitions>NDEBUG;_WINDOWS;_CRT_STDIO_ARBITRARY_WIDE_SPECIFIERS;_CRT_SECURE_NO_WARNINGS;_CRT_SECURE_NO_DEPRECATE;_CRT_NON_CONFORMING_SWPRINTFS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
 			<StringPooling>true</StringPooling>
 			<MinimalRebuild>false</MinimalRebuild>
 			<ExceptionHandling>false</ExceptionHandling>
 			<BasicRuntimeChecks>Default</BasicRuntimeChecks>
-			<RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+			<RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
 			<BufferSecurityCheck>false</BufferSecurityCheck>
 			<RuntimeTypeInfo>false</RuntimeTypeInfo>
 			<!-- Note: Incompatible with x64. <EnableEnhancedInstructionSet>StreamingSIMDExtensions</EnableEnhancedInstructionSet> -->

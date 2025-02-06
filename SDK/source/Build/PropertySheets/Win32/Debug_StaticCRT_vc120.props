@@ -16,14 +16,12 @@
 			<RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
 			<BufferSecurityCheck>false</BufferSecurityCheck>
 			<RuntimeTypeInfo>false</RuntimeTypeInfo>
-			<TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
 			<!-- Note: Incompatible with x64. <EnableEnhancedInstructionSet>StreamingSIMDExtensions</EnableEnhancedInstructionSet> -->
 			<FloatingPointModel>Fast</FloatingPointModel>
 			<!-- Note: Project specific <PrecompiledHeader></PrecompiledHeader> -->
 			<ProgramDataBaseFileName>$(OutDir)$(ProjectName).pdb</ProgramDataBaseFileName>
 			<WarningLevel>Level3</WarningLevel>
 			<DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-			<ForceConformanceInForLoopScope>true</ForceConformanceInForLoopScope>
 		</ClCompile>
 		<Link>
 		</Link>

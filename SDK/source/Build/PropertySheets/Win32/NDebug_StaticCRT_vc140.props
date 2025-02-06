@@ -4,15 +4,17 @@
 	
 	<ItemDefinitionGroup>
 		<ClCompile>
-			<Optimization>Disabled</Optimization>
-			<InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
-			<OmitFramePointers>false</OmitFramePointers>
+			<Optimization>MaxSpeed</Optimization>
+			<InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
 			<IntrinsicFunctions>true</IntrinsicFunctions>
-			<PreprocessorDefinitions>_DEBUG;_CRT_SECURE_NO_WARNINGS;_CRT_SECURE_NO_DEPRECATE;_CRT_NON_CONFORMING_SWPRINTFS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+			<OmitFramePointers>false</OmitFramePointers>
+			<PreprocessorDefinitions>NDEBUG;_WINDOWS;_CRT_STDIO_ARBITRARY_WIDE_SPECIFIERS;_CRT_SECURE_NO_WARNINGS;_CRT_SECURE_NO_DEPRECATE;_CRT_NON_CONFORMING_SWPRINTFS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
 			<StringPooling>true</StringPooling>
 			<MinimalRebuild>false</MinimalRebuild>
 			<ExceptionHandling>false</ExceptionHandling>
-			<RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+			<BasicRuntimeChecks>Default</BasicRuntimeChecks>
+			<RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+			<BufferSecurityCheck>false</BufferSecurityCheck>
 			<RuntimeTypeInfo>false</RuntimeTypeInfo>
 			<!-- Note: Incompatible with x64. <EnableEnhancedInstructionSet>StreamingSIMDExtensions</EnableEnhancedInstructionSet> -->
 			<FloatingPointModel>Fast</FloatingPointModel>
@@ -20,7 +22,9 @@
 			<ProgramDataBaseFileName>$(OutDir)$(ProjectName).pdb</ProgramDataBaseFileName>
 			<WarningLevel>Level3</WarningLevel>
 			<DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-			<ForceConformanceInForLoopScope>true</ForceConformanceInForLoopScope>
+			<AdditionalOptions>/Zc:inline %(AdditionalOptions)</AdditionalOptions>
 		</ClCompile>
+		<Link>
+		</Link>
 	</ItemDefinitionGroup>
 </Project>
