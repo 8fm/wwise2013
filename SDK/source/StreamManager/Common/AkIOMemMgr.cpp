@@ -10,16 +10,20 @@
 
 #include "stdafx.h"
 #include "AkIOMemMgr.h"
+#include "AkIOThread.h"
 #include <stdio.h>
 
 using namespace AK;
 using namespace AK::StreamMgr;
 
+inline AkUInt32 RoundToBlockSize(AkUInt32 in_uRequestedSize, AkUInt32 in_uAlignment)
+{
+	return (((in_uRequestedSize - 1) / in_uAlignment) + 1 ) * in_uAlignment;
+}
+
 CAkIOMemMgr::CAkIOMemMgr()
-: m_pIOMemory( NULL )
-, m_pMemBlocks( NULL )
-, m_streamIOPoolId( AK_INVALID_POOL_ID )
-, m_uNumViewsAvail( 0 )
+: m_totalCachedMem(0)
+, m_totalAllocedMem(0)
 , m_bUseCache( false )
 #ifndef AK_OPTIMIZED
 , m_streamIOPoolSize( 0 )
@@ -35,75 +39,54 @@ CAkIOMemMgr::~CAkIOMemMgr()
 }
 
 AKRESULT CAkIOMemMgr::Init( 
-	const AkDeviceSettings &	in_settings 
+	const AkDeviceSettings &	in_settings ,
+	CAkIOThread* in_pIoThread
 	)
 {
+	AKASSERT(in_pIoThread != NULL);
+	m_pIoThread = in_pIoThread;
+
 	// Number of I/O buffers and effective pool size:
 	AkUInt32 uNumBuffers = in_settings.uIOMemorySize / in_settings.uGranularity;
 	AkUInt32 uMemorySize = uNumBuffers * in_settings.uGranularity;
 
+	m_totalAllocedMem = 0;
+	m_totalCachedMem = 0;
+
 	// Create stream memory pool.
     if ( uMemorySize > 0 )
     {		
-		m_streamIOPoolId = AK::MemoryMgr::CreatePool( 
-            in_settings.pIOMemory,
-			uMemorySize,
-			uMemorySize,
-			in_settings.ePoolAttributes | AkFixedSizeBlocksMode,
-			in_settings.uIOMemoryAlignment );        
+		static const AkUInt32 kAbsoluteMinBlockSize = 512; //Review: This could be smaller to decrease fragmentation but will effect performance.
+
+		AkUInt32 uMinBlockSize = kAbsoluteMinBlockSize;
+		while (uMinBlockSize < in_settings.uIOMemoryAlignment)
+			uMinBlockSize = uMinBlockSize << 1;
+
+		AkUInt32 uMaxBlockSize = uMinBlockSize;
+		while (uMaxBlockSize < in_settings.uGranularity)
+			uMaxBlockSize = uMaxBlockSize << 1;
+
+		m_StreamPool.Init(uMemorySize, uMaxBlockSize, uMinBlockSize, in_settings.ePoolAttributes, in_settings.pIOMemory);
     }
 
-    if( m_streamIOPoolId != AK_INVALID_POOL_ID )
+	if (m_StreamPool.IsInitialized())
 	{
-        // This pool must not send error notifications: not having memory is normal and notifications are costly.
-        AK::MemoryMgr::SetMonitoring(
-            m_streamIOPoolId,
-            false );
-
-        AK_SETPOOLNAME( m_streamIOPoolId, AKTEXT("Stream I/O") );
+		AK_SETPOOLNAME(m_StreamPool.GetPoolId(), AKTEXT("Stream I/O"));
 
 #ifndef AK_OPTIMIZED
 		m_streamIOPoolSize = uMemorySize;
 #endif
 
-		// "Allocate" all pool and create I/O blocks pool.
-		m_pIOMemory = AK::MemoryMgr::GetBlock( m_streamIOPoolId );
-		AKASSERT( m_pIOMemory );	// Has to succeed.
-
-		m_pMemBlocks = (AkMemBlock*)AkAlloc( CAkStreamMgr::GetObjPoolID(), uNumBuffers * sizeof( AkMemBlock ) );
-		if ( !m_pMemBlocks )
-		{
-			AKASSERT( !"Not enough memory in the stream manager pool to index stream IO buffers" );
-			return AK_Fail;
-		}
-
-		AkUInt8 * pIOMemory = (AkUInt8*)m_pIOMemory;
-		AkMemBlock * pBlock = m_pMemBlocks;
-		const AkMemBlock * pBlockEnd = pBlock + uNumBuffers;
-		do
-		{
-			AkPlacementNew( pBlock ) AkMemBlock( pIOMemory );
-			pIOMemory += in_settings.uGranularity;
-			m_listFreeBuffers.AddLast( pBlock++ );
-		}
-		while ( pBlock < pBlockEnd );
-		
-		// Create cached memory dictionnary.
-		if ( m_arMemBlocks.Reserve( uNumBuffers ) != AK_Success )
+		// Create cached memory dictionary.
+		// This array is growable but we will preallocate an estimate of the max number of blocks
+		if ( m_arTaggedBlocks.Reserve( uNumBuffers ) != AK_Success )
 		{
 			AKASSERT( !"Not enough memory in the stream manager pool to create cache repository" );
 			return AK_Fail;
 		}
-		for ( AkUInt16 uIndex = 0; uIndex<uNumBuffers; uIndex++ )
-		{
-			m_arMemBlocks.AddLast( uIndex );
-		}
 
 		// Compute number of views available in order to respect the maximum cache ratio.
-		m_uNumViewsAvail = (AkUInt32)( in_settings.fMaxCacheRatio * uNumBuffers + 0.5f );
-		if ( m_uNumViewsAvail < uNumBuffers )
-			m_uNumViewsAvail = uNumBuffers;
-		m_bUseCache = ( in_settings.fMaxCacheRatio > 1.f );
+		m_bUseCache = in_settings.bUseStreamCache;
 	}
     else if ( in_settings.uIOMemorySize > 0 )
     {
@@ -115,34 +98,55 @@ AKRESULT CAkIOMemMgr::Init(
 	return AK_Success;
 }
 
+AkMemBlock* CAkIOMemMgr::AllocMemBlock( AkUInt32 in_uAllocSize, AkUInt32 in_uRequestedSize, AkUInt32 in_uAlignment )
+{
+	AkUInt8 * pIOMemory = (AkUInt8*)m_StreamPool.Alloc( in_uAllocSize );
+	if (pIOMemory)
+	{
+		AKASSERT((AkUIntPtr)pIOMemory % in_uAlignment == 0);
+
+		AkMemBlock* pBlk = AkNew( CAkStreamMgr::GetObjPoolID(), AkMemBlock( pIOMemory ) );
+		if (pBlk)
+		{
+			pBlk->uAllocSize = in_uAllocSize;
+			pBlk->uAvailableSize = in_uRequestedSize;
+			m_totalAllocedMem += in_uAllocSize;
+			UpdatePeakMemUsed();
+			return pBlk;
+		}
+		else
+		{
+			m_StreamPool.Free(pIOMemory, in_uAllocSize);
+		}
+	}
+	
+	return NULL;
+}
+
+void CAkIOMemMgr::FreeMemBlock( AkMemBlock* in_pBlk )
+{
+	//Block must be untagged first
+	AKASSERT(!in_pBlk->IsTagged());
+	
+	m_totalAllocedMem -= in_pBlk->uAllocSize;
+
+	m_StreamPool.Free(in_pBlk->pData, in_pBlk->uAllocSize);
+
+	AkDelete(CAkStreamMgr::GetObjPoolID(), in_pBlk );
+
+	m_pIoThread->NotifyMemChange();
+}
+
 void CAkIOMemMgr::Term()
 {
-	// Free IO memory index.
-#ifdef _DEBUG
-	// Ensure all blocks have been freed properly.
-	AkMemBlocksDictionnary::Iterator it = m_arMemBlocks.Begin();
-	while ( it != m_arMemBlocks.End() )
-	{
-		AKASSERT( (IndexToMemBlock(*it))->uRefCount == 0 );
-		++it;
-	}
-#endif
-	m_arMemBlocks.Term();
-
-	if ( !m_listFreeBuffers.IsEmpty() )
-	{
-		m_listFreeBuffers.RemoveAll();
-		AkFree( CAkStreamMgr::GetObjPoolID(), m_pMemBlocks );
-	}
-	m_listFreeBuffers.Term();
+	FlushCache();
+	m_listCachedBuffers.Term();
+	m_arTaggedBlocks.Term();
 
     // Destroy IO pool.
-	if ( m_streamIOPoolId != AK_INVALID_POOL_ID )
-	{
-		AK::MemoryMgr::ReleaseBlock( m_streamIOPoolId, m_pIOMemory );
-        AKVERIFY( AK::MemoryMgr::DestroyPool( m_streamIOPoolId ) == AK_Success );
-		m_streamIOPoolId = AK_INVALID_POOL_ID;
-	}
+	m_StreamPool.Term();
+
+	m_pIoThread = NULL;
 }
 
 // IO memory access.
@@ -163,17 +167,23 @@ AkUInt32 CAkIOMemMgr::ReleaseBlock(
 
 		// Add on top of the FIFO if the block is not tagged, at the end otherwise.
 		if ( in_pMemBlock->IsTagged() )
-			m_listFreeBuffers.AddLast( in_pMemBlock );
+		{
+			m_totalCachedMem += in_pMemBlock->uAvailableSize;
+			m_listCachedBuffers.AddLast( in_pMemBlock );
+
+			// Adding the memory bloc to the list of cached buffers means that it is 
+			//	up for grabs by some other stream. Notify the io thread.
+			m_pIoThread->NotifyMemChange();
+		}
 		else
-			m_listFreeBuffers.AddFirst( in_pMemBlock );
+		{
+			FreeMemBlock(in_pMemBlock);
+		}
 
 #ifndef AK_OPTIMIZED
 		++m_uFrees;
 #endif
 	}
-
-	++m_uNumViewsAvail;
-	AKASSERT( m_uNumViewsAvail >= m_listFreeBuffers.Length() );
 
 	return uRefCount;
 }
@@ -181,28 +191,60 @@ AkUInt32 CAkIOMemMgr::ReleaseBlock(
 // Get a free memory block.
 // Returned memory block is addref'd (to 1), NULL if none found.
 void CAkIOMemMgr::GetOldestFreeBlock(
+	AkUInt32	in_uRequestedBufferSize,
+	AkUInt32	in_uBlockAlign,
 	AkMemBlock *&	out_pMemBlock
 	)
 {
-	out_pMemBlock = m_listFreeBuffers.First();
-	if ( out_pMemBlock )
+	CHECK_CACHE_CONSISTENCY( NULL );
+
+	AkUInt32 uAllocationSize = RoundToBlockSize(in_uRequestedBufferSize, in_uBlockAlign);
+	do
 	{
-		AKASSERT( out_pMemBlock->uRefCount == 0 );
-		++out_pMemBlock->uRefCount;
+		out_pMemBlock = AllocMemBlock(uAllocationSize, in_uRequestedBufferSize, in_uBlockAlign );
+		if (!out_pMemBlock)
+		{
+			out_pMemBlock = m_listCachedBuffers.First();
+			if (out_pMemBlock == NULL)
+			{
+				//No available memory.  Bail out!
+				m_pIoThread->NotifyMemIdle();
+				return;
+			}
 
-		m_listFreeBuffers.RemoveFirst();
+			AKASSERT( out_pMemBlock->uRefCount == 0 );
+			m_totalCachedMem -= out_pMemBlock->uAvailableSize;
+			UpdatePeakMemUsed();
+			m_listCachedBuffers.RemoveFirst();
 
-		--m_uNumViewsAvail;
-		AKASSERT( m_uNumViewsAvail >= m_listFreeBuffers.Length() );
+			// pNextBlock is not used now that the block was dequeued, but it is an union with pTransfer, 
+			// so we ought to clear it now.
+			out_pMemBlock->pTransfer = NULL;
+
+			if ( out_pMemBlock->uAllocSize != uAllocationSize )
+			{
+				//Too small, or too big. Ditch it an try to scape up some more memory from the allocator
+				if (out_pMemBlock->IsTagged())
+					UntagBlock(out_pMemBlock);
+
+				FreeMemBlock(out_pMemBlock);
+				out_pMemBlock = NULL;
+			}
+		}
+	}
+	while ( out_pMemBlock == NULL );
+
+	//Should have a valid block at this point, otherwise we would have bailed out above.
+	AKASSERT ( out_pMemBlock != NULL);
+	
+	CHECK_CACHE_CONSISTENCY( out_pMemBlock );
+
+	++out_pMemBlock->uRefCount;
 
 #ifndef AK_OPTIMIZED
-		++m_uAllocs;
+	++m_uAllocs;
 #endif
 
-		// pNextBlock is not used now that the block was dequeued, but it is an union with pTransfer, 
-		// so we ought to clear it now.
-		out_pMemBlock->pTransfer = NULL;
-	}
 }
 
 #ifdef _DEBUG
@@ -211,10 +253,10 @@ void CAkIOMemMgr::CheckCacheConsistency( AkMemBlock * in_pMustFindBlock )
 {
 	AkMemBlock * pPrevBlock = NULL;
 	bool bFound = ( in_pMustFindBlock == NULL );
-	AkMemBlocksDictionnary::Iterator it = m_arMemBlocks.Begin();
-	while ( it != m_arMemBlocks.End() )
+	AkMemBlocksDictionnary::Iterator it = m_arTaggedBlocks.Begin();
+	while ( it != m_arTaggedBlocks.End() )
 	{
-		AkMemBlock * pThisBlock = IndexToMemBlock((*it));
+		AkMemBlock * pThisBlock = (*it);
 		if ( pPrevBlock 
 			&& ( pPrevBlock->fileID > pThisBlock->fileID
 				|| ( pPrevBlock->fileID == pThisBlock->fileID && pPrevBlock->uPosition < pThisBlock->uPosition )
@@ -229,7 +271,7 @@ void CAkIOMemMgr::CheckCacheConsistency( AkMemBlock * in_pMustFindBlock )
 		pPrevBlock = pThisBlock;
 		++it;
 	}
-	AKASSERT( bFound );
+	AKASSERT( bFound || in_pMustFindBlock->fileID == AK_INVALID_FILE_ID );
 }
 #endif
 
@@ -237,10 +279,10 @@ void CAkIOMemMgr::CheckCacheConsistency( AkMemBlock * in_pMustFindBlock )
 void CAkIOMemMgr::PrintCache()
 {
 	AKPLATFORM::OutputDebugMsg( "Index FileID Position Size\n" );
-	AkMemBlocksDictionnary::Iterator it = m_arMemBlocks.Begin();
-	while ( it != m_arMemBlocks.End() )
+	AkMemBlocksDictionnary::Iterator it = m_arTaggedBlocks.Begin();
+	while ( it != m_arTaggedBlocks.End() )
 	{
-		AkMemBlock * pMemBlock = IndexToMemBlock((*it));
+		AkMemBlock * pMemBlock = (*it);
 		char msg[64];
 		sprintf( msg, "%u\t%u\t%lu\t%u\n", (*it), pMemBlock->fileID, (AkUInt32)pMemBlock->uPosition, pMemBlock->uAvailableSize );
 		AKPLATFORM::OutputDebugMsg( msg );
@@ -298,11 +340,8 @@ AkUInt32 CAkIOMemMgr::GetCachedBlock(
 
 	out_pMemBlock = NULL;
 
-	// Check if max caching was reached.
-	AKASSERT( m_uNumViewsAvail >= m_listFreeBuffers.Length() );
-	if ( m_uNumViewsAvail == m_listFreeBuffers.Length() )
+	if (m_arTaggedBlocks.IsEmpty())
 	{
-		// Cannot reference cached data anymore. Small object pool is going to blow. Bail out.
 		return 0;
 	}
 
@@ -312,15 +351,15 @@ AkUInt32 CAkIOMemMgr::GetCachedBlock(
 	
 	// 1) Perform a binary search to bring us just before or right on the block that matches the file ID and 
 	// data position.
-	int iTop = 0, iBottom = m_arMemBlocks.Length()-1;
+	int iTop = 0, iBottom = m_arTaggedBlocks.Length()-1;
 	int iThis = ( iBottom - iTop ) / 2 + iTop; 
 	do
 	{
 		iThis = ( iBottom - iTop ) / 2 + iTop; 
-		int iCmp = Compare_FileID_Position( IndexToMemBlock(m_arMemBlocks[iThis]), in_fileID, in_uPosition );
+		int iCmp = Compare_FileID_Position( m_arTaggedBlocks[iThis], in_fileID, in_uPosition );
 		if ( 0 == iCmp )
 		{
-			pMemBlock = IndexToMemBlock(m_arMemBlocks[iThis]);
+			pMemBlock = m_arTaggedBlocks[iThis];
 			break;
 		}
 		else if ( iCmp < 0 )
@@ -339,10 +378,10 @@ AkUInt32 CAkIOMemMgr::GetCachedBlock(
 	{
 		// No perfect match, or perfect match not valid.
 		// The current pick may be usable.
-		AkMemBlock * pCurrentPick = IndexToMemBlock(m_arMemBlocks[iThis]);
+		AkMemBlock * pCurrentPick = m_arTaggedBlocks[iThis];
 		if ( in_fileID == pCurrentPick->fileID
 			&& in_uPosition >= pCurrentPick->uPosition
-			&& in_uPosition <= pCurrentPick->uPosition + pCurrentPick->uAvailableSize - in_uMinSize )
+			&& ((AkInt32)in_uPosition) <= (AkInt32)(pCurrentPick->uPosition + pCurrentPick->uAvailableSize - in_uMinSize) )
 		{
 			pMemBlock = pCurrentPick;
 		}
@@ -350,12 +389,12 @@ AkUInt32 CAkIOMemMgr::GetCachedBlock(
 		{
 			// Otherwise the next block may also be usable.
 			int iNextBlock = iThis + 1;
-			if( iNextBlock < (AkInt32)m_arMemBlocks.Length() )
+			if( iNextBlock < (AkInt32)m_arTaggedBlocks.Length() )
 			{
-				AkMemBlock * pSecondBestBlock = IndexToMemBlock(m_arMemBlocks[iNextBlock]);
+				AkMemBlock * pSecondBestBlock = m_arTaggedBlocks[iNextBlock];
 				if ( in_fileID == pSecondBestBlock->fileID
 					&& in_uPosition >= pSecondBestBlock->uPosition
-					&& in_uPosition <= pSecondBestBlock->uPosition + pSecondBestBlock->uAvailableSize - in_uMinSize )
+					&& ((AkInt32)in_uPosition) <= (AkInt32)(pSecondBestBlock->uPosition + pSecondBestBlock->uAvailableSize - in_uMinSize ) )
 				{
 					pMemBlock = pSecondBestBlock;
 				}
@@ -398,7 +437,11 @@ AkUInt32 CAkIOMemMgr::GetCachedBlock(
 		{
 			// Free block. Pop it out of the free list.
 			/// REVIEW Consider having an option to avoid searching cached data into free blocks. Would avoid this linear search.
-			AKVERIFY( m_listFreeBuffers.Remove( pMemBlock ) == AK_Success );
+			AKVERIFY( m_listCachedBuffers.Remove( pMemBlock ) == AK_Success );
+
+			m_totalCachedMem -= pMemBlock->uAvailableSize;
+			UpdatePeakMemUsed();
+
 			// pNextBlock is not used now that the block was dequeued, but it is an union with pTransfer, 
 			// so we ought to clear it now.
 			pMemBlock->pTransfer = NULL;
@@ -407,9 +450,6 @@ AkUInt32 CAkIOMemMgr::GetCachedBlock(
 #endif
 		}
 		++pMemBlock->uRefCount;
-
-		--m_uNumViewsAvail;
-		AKASSERT( m_uNumViewsAvail >= m_listFreeBuffers.Length() );
 
 		out_pMemBlock = pMemBlock;
 		return uPositionOffset;
@@ -457,23 +497,19 @@ void CAkIOMemMgr::UntagBlock(
 	// Find block, remove, untag, reinsert.
 	CHECK_CACHE_CONSISTENCY( in_pMemBlock );
 
-#ifdef _DEBUG
-	bool bFound = false;
-#endif
-
+	AKASSERT(!m_arTaggedBlocks.IsEmpty());
+	
 	// Find the index of the block in the list, using all three keys.
 	// Binary search: blocks are always sorted (file ID first, position second, buffer address third).
-	AkInt32 iTop = 0, iBottom = m_arMemBlocks.Length()-1;
+	AkInt32 iTop = 0, iBottom = m_arTaggedBlocks.Length()-1;
 	AkInt32 iThis;
 	do
 	{
 		iThis = ( iBottom - iTop ) / 2 + iTop; 
-		int iCmp = Compare_AllKeys( IndexToMemBlock(m_arMemBlocks[iThis]), in_pMemBlock );
+		int iCmp = Compare_AllKeys( m_arTaggedBlocks[iThis], in_pMemBlock );
 		if ( 0 == iCmp )
 		{
-#ifdef _DEBUG
-			bFound = true;
-#endif
+			m_arTaggedBlocks.Erase( iThis );
 			break;
 		}
 		else if ( iCmp < 0 )
@@ -482,38 +518,6 @@ void CAkIOMemMgr::UntagBlock(
 			iTop = iThis + 1;
 	}
 	while ( iTop <= iBottom );
-
-	AKASSERT( bFound || !"Block wasn't found in list" );
-	
-	AkUInt32 uOriginalLocation = iThis;
-	
-	// Find the location where our "untagged" block should be inserted.
-	// Need to use a temporary block with such info.
-	AkMemBlock newBlockData = *in_pMemBlock;
-	newBlockData.fileID = AK_INVALID_FILE_ID;
-
-	iTop = 0;
-	iBottom = m_arMemBlocks.Length()-1;
-	do
-	{
-		iThis = ( iBottom - iTop ) / 2 + iTop; 
-		int iCmp = Compare_AllKeys( IndexToMemBlock(m_arMemBlocks[iThis]), &newBlockData );
-		if ( 0 == iCmp )
-		{
-			iBottom = iTop = iThis;
-			break;
-		}
-		else if ( iCmp < 0 )
-			iBottom = iThis - 1;
-		else
-			iTop = iThis + 1;
-	}
-	while ( iTop <= iBottom );
-
-	// Insert at index either iBottom or iTop, depending on whether the location was found from above or below.
-	AkUInt32 uNewLocation = AkMax( iBottom, iTop );
-	
-	m_arMemBlocks.Move( uOriginalLocation, uNewLocation );
 
 	// Set info on actual block.
 	in_pMemBlock->fileID			= AK_INVALID_FILE_ID;
@@ -522,25 +526,33 @@ void CAkIOMemMgr::UntagBlock(
 }
 
 // Untag all blocks (cache flush).
-void CAkIOMemMgr::UntagAllBlocks()
+void CAkIOMemMgr::FlushCache()
 {
 	if ( m_bUseCache )
 	{
-		// Avoid touching the index dictionnary if block is not tagged.
-		// 1st key of all blocks is set to INVALID, but ordering still needs to be updated
-		// because of 2nd and 3rd keys. This is quite costly.
-		AkUInt32 uNumBlocks = m_arMemBlocks.Length();
-		for ( AkUInt32 uBlock = 0; uBlock < uNumBlocks; uBlock++ )
+		CHECK_CACHE_CONSISTENCY( NULL );
+
+		m_listCachedBuffers.RemoveAll();
+
+		AkUInt32 uNewArrayLen = m_arTaggedBlocks.Length();
+		for ( AkMemBlocksDictionnary::Iterator dictIt = m_arTaggedBlocks.Begin(); dictIt != m_arTaggedBlocks.End(); ++ dictIt )
 		{
-			if ( m_pMemBlocks[uBlock].IsTagged() )
-				UntagBlock( &m_pMemBlocks[uBlock] );
+			AkMemBlock *& pMemBlk = (*dictIt);
+			pMemBlk->fileID = AK_INVALID_FILE_ID;
+			if (pMemBlk->uRefCount == 0)
+			{
+				FreeMemBlock(pMemBlk);
+			}
 		}
+
+		m_arTaggedBlocks.RemoveAll();
+
 		CHECK_CACHE_CONSISTENCY( NULL );
 	}
 }
 
 // Tag a block with caching info before IO transfer.
-void CAkIOMemMgr::TagBlock(
+AKRESULT CAkIOMemMgr::TagBlock(
 	AkMemBlock *	in_pMemBlock,		// Memory block to tag with caching info.
 	CAkLowLevelTransfer * in_pTransfer,	// Associated transfer.
 	AkFileID		in_fileID,			// File ID.
@@ -548,88 +560,96 @@ void CAkIOMemMgr::TagBlock(
 	AkUInt32		in_uDataSize		// Size of valid data fetched from Low-Level IO.
 	)
 {
-	if ( !UseCache() )
+	AKRESULT res = AK_Fail;
+
+	AKASSERT( in_pMemBlock->uRefCount == 1 );
+
+	if ( !UseCache() || in_fileID == AK_INVALID_FILE_ID )
 	{
 		// Not using cache. Blocks are never kept reordered. Just set data and leave.
-		AKASSERT( in_pMemBlock->uRefCount == 1 );
 		in_pMemBlock->uPosition			= in_uPosition;
 		in_pMemBlock->uAvailableSize	= in_uDataSize;	
 		in_pMemBlock->pTransfer			= in_pTransfer;
-		return;
+		return AK_Success;
 	}
 
 	AKASSERT( !in_pMemBlock->pTransfer || !"Block already has transfer" );	// If you intend to tag this block, it should have been free.
-	AKASSERT( in_pMemBlock->uRefCount == 1 );
-
+	
 	CHECK_CACHE_CONSISTENCY( in_pMemBlock );
 
-#ifdef _DEBUG
 	bool bFound = false;
-#endif
+	AkUInt32 uOriginalLocation = m_arTaggedBlocks.Length();
 
-	// Find the index of the block in the list, using all three keys.
-	// Binary search: blocks are always sorted (file ID first, position second, buffer address third).
-	AkInt32 iTop = 0, iBottom = m_arMemBlocks.Length()-1;
-	AkInt32 iThis;
-	do
+	if (!m_arTaggedBlocks.IsEmpty())
 	{
-		iThis = ( iBottom - iTop ) / 2 + iTop; 
-		int iCmp = Compare_AllKeys( IndexToMemBlock(m_arMemBlocks[iThis]), in_pMemBlock );
-		if ( 0 == iCmp )
+		// Find the index of the block in the list, using all three keys.
+		// Binary search: blocks are always sorted (file ID first, position second, buffer address third).
+		AkInt32 iTop = 0, iBottom = m_arTaggedBlocks.Length()-1;
+		AkInt32 iThis;
+		do
 		{
-#ifdef _DEBUG
-			bFound = true;
-#endif
-			break;
+			iThis = ( iBottom - iTop ) / 2 + iTop; 
+			int iCmp = Compare_AllKeys( m_arTaggedBlocks[iThis], in_pMemBlock );
+			if ( 0 == iCmp )
+			{
+				bFound = true;
+				uOriginalLocation = iThis;
+				break;
+			}
+			else if ( iCmp < 0 )
+				iBottom = iThis - 1;
+			else
+				iTop = iThis + 1;
 		}
-		else if ( iCmp < 0 )
-			iBottom = iThis - 1;
-		else
-			iTop = iThis + 1;
+		while ( iTop <= iBottom );
 	}
-	while ( iTop <= iBottom );
-
-	AKASSERT( bFound || !"Block wasn't found in list" );
-
-	AkUInt32 uOriginalLocation = iThis;
-
-
-	// Find the location where our block should be inserted.
-	// Need to use a temporary block with such info.
-	AkMemBlock newBlockData = *in_pMemBlock;
-	newBlockData.fileID				= in_fileID;
-	newBlockData.uPosition			= in_uPosition;
-
-	iTop = 0;
-	iBottom = m_arMemBlocks.Length()-1;
-	do
+	
+	// If the block was not found in the list, then we have to add it.
+	if (bFound || m_arTaggedBlocks.AddLast(in_pMemBlock) != NULL )
 	{
-		iThis = ( iBottom - iTop ) / 2 + iTop; 
-		int iCmp = Compare_AllKeys( IndexToMemBlock(m_arMemBlocks[iThis]), &newBlockData );
-		if ( 0 == iCmp )
+		AKASSERT(!m_arTaggedBlocks.IsEmpty());
+
+		// Find the location where our block should be inserted.
+		// Need to use a temporary block with such info.
+		AkMemBlock newBlockData = *in_pMemBlock;
+		newBlockData.fileID				= in_fileID;
+		newBlockData.uPosition			= in_uPosition;
+
+		AkInt32 iTop = 0, iBottom = m_arTaggedBlocks.Length()-1;
+		AkInt32 iThis;
+		do
 		{
-			iBottom = iTop = iThis;
-			break;
+			iThis = ( iBottom - iTop ) / 2 + iTop; 
+			int iCmp = Compare_AllKeys( m_arTaggedBlocks[iThis], &newBlockData );
+			if ( 0 == iCmp )
+			{
+				iBottom = iTop = iThis;
+				break;
+			}
+			else if ( iCmp < 0 )
+				iBottom = iThis - 1;
+			else
+				iTop = iThis + 1;
 		}
-		else if ( iCmp < 0 )
-			iBottom = iThis - 1;
-		else
-			iTop = iThis + 1;
+		while ( iTop <= iBottom );
+
+		// Insert at index either iBottom or iTop, depending on whether the location was found from above or below.
+		AkUInt32 uNewLocation = AkMax( iBottom, iTop );
+
+		m_arTaggedBlocks.Move( uOriginalLocation, uNewLocation );
+
+		in_pMemBlock->fileID			= in_fileID;
+		
+		res = AK_Success;
 	}
-	while ( iTop <= iBottom );
 
-	// Insert at index either iBottom or iTop, depending on whether the location was found from above or below.
-	AkUInt32 uNewLocation = AkMax( iBottom, iTop );
-
-	m_arMemBlocks.Move( uOriginalLocation, uNewLocation );
-
-	// Set info on actual block.
-	in_pMemBlock->fileID			= in_fileID;
 	in_pMemBlock->uPosition			= in_uPosition;
 	in_pMemBlock->uAvailableSize	= in_uDataSize;	
 	in_pMemBlock->pTransfer			= in_pTransfer;
 
 	CHECK_CACHE_CONSISTENCY( in_pMemBlock );
+
+	return res;
 }
 
 // Temporary blocks.
@@ -670,13 +690,20 @@ void CAkIOMemMgr::GetProfilingData(
 {
 #ifndef AK_OPTIMIZED
 	out_deviceData.uMemSize = m_streamIOPoolSize;
-	out_deviceData.uMemUsed = out_deviceData.uMemSize - ( in_uBlockSize * m_listFreeBuffers.Length() );
+	out_deviceData.uMemUsed = m_totalAllocedMem;
 	out_deviceData.uAllocs	= m_uAllocs;
 	out_deviceData.uFrees	= m_uFrees;
-	if ( out_deviceData.uMemUsed > m_uPeakUsed )
-		m_uPeakUsed = out_deviceData.uMemUsed;
-	out_deviceData.uPeakUsed = m_uPeakUsed;
-	out_deviceData.uNumViewsAvailable = m_uNumViewsAvail;
+	out_deviceData.uPeakRefdMemUsed = m_uPeakUsed;
+	out_deviceData.uUnreferencedCachedBytes = m_totalCachedMem;
+#endif
+}
+
+void CAkIOMemMgr::UpdatePeakMemUsed()
+{
+#ifndef AK_OPTIMIZED
+	AkUInt32 uRefdMemUsed = (m_totalAllocedMem - m_totalCachedMem);
+	if (uRefdMemUsed > m_uPeakUsed)
+		m_uPeakUsed = uRefdMemUsed;
 #endif
 }
 

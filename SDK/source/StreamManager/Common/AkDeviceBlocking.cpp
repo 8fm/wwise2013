@@ -33,27 +33,6 @@ AKRESULT CAkDeviceBlocking::Init(
     )
 {
 	AKRESULT eResult = CAkDeviceBase::Init( in_settings, in_deviceID );
-	if ( eResult == AK_Success )
-	{
-		// Preallocate streaming memory views.
-		// The maximum number of views is the memory pool manager's max number of views + 1 (for low-level transfer).
-		AkUInt32 uNumViews = m_mgrMemIO.NumViewsAvailable() + 1;
-		m_pStmMemViewMem = (CAkStmMemView*)AkAlloc( CAkStreamMgr::GetObjPoolID(), uNumViews * sizeof( CAkStmMemView ) );
-		if ( !m_pStmMemViewMem )
-		{
-			AKASSERT( !"Not enough memory in the stream manager pool to create stream buffer holders." );
-			return AK_Fail;
-		}
-
-		CAkStmMemView * pMemView = m_pStmMemViewMem;
-		CAkStmMemView * pMemViewEnd = pMemView + uNumViews;
-		do
-		{
-			AkPlacementNew( pMemView ) CAkStmMemView( true ); 
-			m_poolStmMemView.AddFirst( pMemView++ );
-		}
-		while ( pMemView < pMemViewEnd );
-	}
 	return eResult;
 }
 
@@ -61,7 +40,7 @@ AKRESULT CAkDeviceBlocking::Init(
 // --------------------------------------------------------
 
 // Standard stream.
-CAkStmTask * CAkDeviceBlocking::CreateStd(
+CAkStmTask * CAkDeviceBlocking::_CreateStd(
     AkFileDesc *		in_pFileDesc,		// Application defined ID.
     AkOpenMode          in_eOpenMode,       // Open mode (read, write, ...).
     IAkStdStream *&     out_pStream         // Returned interface to a standard stream.    
@@ -95,7 +74,6 @@ CAkStmTask * CAkDeviceBlocking::CreateStd(
 
     if ( AK_Success == eResult )
 	{
-		AddTask( pNewStm );
 		out_pStream = pNewStm;
 		return pNewStm;
 	}
@@ -111,7 +89,7 @@ CAkStmTask * CAkDeviceBlocking::CreateStd(
 }
 
 // Automatic stream
-CAkStmTask * CAkDeviceBlocking::CreateAuto(
+CAkStmTask * CAkDeviceBlocking::_CreateAuto(
     AkFileDesc *				in_pFileDesc,		// Low-level IO file descriptor.
 	AkFileID					in_fileID,			// Application defined ID. Pass AK_INVALID_FILE_ID if unknown.
     const AkAutoStmHeuristics & in_heuristics,      // Streaming heuristics.
@@ -163,7 +141,6 @@ CAkStmTask * CAkDeviceBlocking::CreateAuto(
 	
     if ( AK_Success == eResult )
     {
-		AddTask( pNewStm );
 		out_pStream = pNewStm;
 		return pNewStm;
 	}
@@ -217,9 +194,11 @@ void CAkDeviceBlocking::ExecuteTask(
     // Get info for IO.
     AkFileDesc * pFileDesc;
 	CAkLowLevelTransfer * pLowLevelXfer;
+	bool bUnused;
 	CAkStmMemView * pMemView = in_pTask->PrepareTransfer( 
 		pFileDesc, 
 		pLowLevelXfer,
+		bUnused,
 		false );
     if ( !pMemView )
 	{
@@ -275,32 +254,6 @@ void CAkDeviceBlocking::ExecuteTask(
     in_pTask->Update( pMemView, eResult, ( pLowLevelXfer != NULL ) );
 }
 
-bool CAkDeviceBlocking::ExecuteCachedTransfer( CAkStmTask * in_pTask )
-{
-	AKASSERT( in_pTask != NULL );
-
-    // Get info for IO.
-    AkFileDesc * pFileDesc;
-	CAkLowLevelTransfer * pLowLevelXfer;
-	CAkStmMemView * pMemView = in_pTask->PrepareTransfer( 
-		pFileDesc, 
-		pLowLevelXfer,
-		true );
-	AKASSERT( !pLowLevelXfer || !"Asked for cached transfer only" );
-
-	if ( !pMemView )
-	{
-		// Transfer is not happening, either because there is already a pending transfer for this
-		// stream, or a low-level transfer was required.
-		return false;
-	}
-
-    // Update task after transfer.
-    in_pTask->Update( pMemView, AK_Success, ( pLowLevelXfer != NULL ) );
-
-	return true;
-}
-
 
 // IO memory access.
 // -----------------------------------------------------
@@ -331,24 +284,27 @@ CAkStmMemView * CAkDeviceBlocking::CreateMemViewStd(
 
 		// If this fails, everything fails.
 		pMemView = MemViewFactory();
-		AKASSERT( pMemView || !"Mem views exceed the maximum amount allowed" );
+		
 	}
 
-	AKASSERT( !in_pMemBlock->IsBusy() );
-	
-	// Get the one and only low-level transfer and attach it to the memblock.
-	out_pLowLevelXfer = PrepareLowLevelTransfer( 
-		in_pOwner,			// Owner task.
-		(AkUInt8*)in_pMemBlock->pData + in_uDataOffset, // Address for transfer.
-		in_uPosition,		// Position in file, relative to start of file.
-		in_uBufferSize,		// Buffer size.
-		in_uRequestedSize	// Requested transfer size.
-		);
-	AKASSERT( out_pLowLevelXfer );	// Cannot fail.
-	in_pMemBlock->pTransfer = out_pLowLevelXfer;
+	if (pMemView)
+	{
+		AKASSERT( !in_pMemBlock->IsBusy() );
 
-	// Create a view to this memory block. The offset is the size that has been read already.
-	pMemView->Attach( in_pMemBlock, in_uDataOffset );
+		// Get the one and only low-level transfer and attach it to the memblock.
+		out_pLowLevelXfer = PrepareLowLevelTransfer( 
+			in_pOwner,			// Owner task.
+			(AkUInt8*)in_pMemBlock->pData + in_uDataOffset, // Address for transfer.
+			in_uPosition,		// Position in file, relative to start of file.
+			in_uBufferSize,		// Buffer size.
+			in_uRequestedSize	// Requested transfer size.
+			);
+		AKASSERT( out_pLowLevelXfer );	// Cannot fail.
+		in_pMemBlock->pTransfer = out_pLowLevelXfer;
+
+		// Create a view to this memory block. The offset is the size that has been read already.
+		pMemView->Attach( in_pMemBlock, in_uDataOffset );
+	}
 	
 	return pMemView;
 }
@@ -396,64 +352,77 @@ CAkStmMemView * CAkDeviceBlocking::CreateMemViewAuto(
 							io_uRequestedSize, 
 							pMemBlock ) : 0;
 
-	if ( !pMemBlock )
-	{
-		// Nothing useful in cache. Acquire free buffer (unless cache-only transfer is desired).
-		if ( in_bCacheOnly )
+	if ( in_bCacheOnly ) //Requested a cache-only transfer. We got some special rules to follow here.
+	{ 
+		if ( pMemBlock == NULL )
+		{
 			return NULL;
-
-		m_mgrMemIO.GetOldestFreeBlock( pMemBlock );
-		if ( pMemBlock )
-		{
-			// Got a new block. Get one and only low-level transfer and tag block.
-			out_pLowLevelXfer = PrepareLowLevelTransfer( 
-				in_pOwner,			// Owner task.
-				pMemBlock->pData,	// Address for transfer.
-				in_uPosition,		// Position in file (relative to start of file).
-				m_uGranularity,		// Buffer size: with automatic streams, even with smaller stream-specific buffer size, 
-									// the maximum size in which the low-level IO may write is m_uGranularity.
-				io_uRequestedSize	// Requested size.
-				);
-			AKASSERT( out_pLowLevelXfer );
-
-			m_mgrMemIO.TagBlock( 
-				pMemBlock, 
-				out_pLowLevelXfer, 
-				in_fileID, 
-				in_uPosition, 
-				io_uRequestedSize 
-				);
-
-			// Memory block obtained requires an IO transfer. Effective address points 
-			// at the beginning of the block. io_uRequestedSize is unchanged. uOffset is 0.
 		}
-		else
+		else if ( pMemBlock->IsBusy() )
 		{
-			// No memory. Get rid of mem view and notify out of memory.
-			NotifyMemIdle();
+			// If using cached data, we need to ensure that the block is not currently being filled up.
+			m_mgrMemIO.ReleaseBlock( pMemBlock );
 			return NULL;
 		}
 	}
-	else
-	{
-		// Else, using cache. No low-level transfer was created. Simply attach the block to our memview.
-		if ( in_bCacheOnly )
-		{
-			// If using cached data, we need to ensure that the block is not currently being filled up.
-			if ( pMemBlock->IsBusy() )
-			{
-				m_mgrMemIO.ReleaseBlock( pMemBlock );
-				return NULL;
-			}
-		}
-	}	
 
 	// Create a view to this memory block.
 	// If this fails, everything fails.
 	CAkStmMemView * pMemView = MemViewFactory();
-	AKASSERT( pMemView || !"Mem views exceed the maximum amount allowed" );
-	pMemView->Attach( pMemBlock, uOffset );
-	
+	if (pMemView)
+	{
+		if (!pMemBlock)
+		{
+			// Nothing useful in cache. Acquire free buffer 
+			m_mgrMemIO.GetOldestFreeBlock( io_uRequestedSize, in_uRequiredAlign, pMemBlock );
+			if ( pMemBlock )
+			{
+				// Got a new block. Get one and only low-level transfer and tag block.
+				out_pLowLevelXfer = PrepareLowLevelTransfer( 
+					in_pOwner,				// Owner task.
+					pMemBlock->pData,		// Address for transfer.
+					in_uPosition,			// Position in file (relative to start of file).
+					pMemBlock->uAllocSize,	// Buffer size: with automatic streams, even with smaller stream-specific buffer size, 
+											// the maximum size in which the low-level IO may write is m_uGranularity.
+					io_uRequestedSize		// Requested size.
+					);
+				AKASSERT( out_pLowLevelXfer );
+
+				//NOTE:  Tagging the memory block can fail.  This will just mean that we can not re-use the block in cache.
+				m_mgrMemIO.TagBlock( 
+					pMemBlock, 
+					out_pLowLevelXfer, 
+					in_fileID, 
+					in_uPosition,
+					io_uRequestedSize
+					);
+
+				// Memory block obtained requires an IO transfer. Effective address points 
+				// at the beginning of the block. io_uRequestedSize is unchanged. uOffset is 0.
+			}
+			else
+			{
+				// No memory. Get rid of mem view and notify out of memory.
+				DestroyMemView(pMemView);
+				return NULL;
+			}
+			
+		}
+
+		pMemView->Attach( pMemBlock, uOffset );
+	}
+	else
+	{
+		// Failed to allocate mem view, make sure to release the block
+		if ( pMemBlock )
+		{
+			m_mgrMemIO.ReleaseBlock( pMemBlock );
+			pMemBlock = NULL;
+		}
+	}
+
+	AKASSERT( (pMemView && pMemBlock) || (!pMemView && !pMemBlock) ); //All or nothing
+
 	return pMemView;
 }
 
@@ -548,13 +517,17 @@ bool CAkStdStmBlocking::CanBeDestroyed()
 CAkStmMemView * CAkStdStmBlocking::PrepareTransfer( 
 	AkFileDesc *&			out_pFileDesc,		// Stream's associated file descriptor.
 	CAkLowLevelTransfer *&	out_pLowLevelXfer,	// Low-level transfer. Set to NULL if it doesn't need to be pushed to the Low-Level IO.
+	bool &					out_bExistingLowLevelXfer, // Always false on the blocking device.
 	bool					
-#ifdef _DEBUG 
+#ifdef AK_ENABLE_ASSERTS 
 		in_bCacheOnly		// NOT Supported.
 #endif
 	)
 {
 	AKASSERT( !in_bCacheOnly || !"Not supported" );
+
+	out_pLowLevelXfer = NULL;
+	out_bExistingLowLevelXfer = false;
 
     // Lock status.
     AkAutoLock<CAkLock> atomicPosition( m_lockStatus );
@@ -605,12 +578,14 @@ CAkStmMemView * CAkStdStmBlocking::PrepareTransfer(
 
 // Update stream object after I/O.
 // Sync: Locks stream's status.
-void CAkStdStmBlocking::Update(
+bool CAkStdStmBlocking::Update(
 	CAkStmMemView *	in_pTransfer,	// Logical transfer object.
 	AKRESULT		in_eIOResult,	// AK_Success if IO was successful, AK_Cancelled if IO was cancelled, AK_Fail otherwise.
 	bool			in_bRequiredLowLevelXfer	// True if this transfer required a call to low-level.
     )
 {
+	bool bBufferAdded = false;
+
 	// Lock status.
     AkAutoLock<CAkLock> update( m_lockStatus );
 
@@ -621,9 +596,11 @@ void CAkStdStmBlocking::Update(
 
 		AKASSERT( in_bRequiredLowLevelXfer );	// Standard stream cannot use cache data.
 		AddMemView( in_pTransfer, bStoreData );
-	}
 
-	m_pCurrentTransfer = NULL;
+		m_pCurrentTransfer = NULL;
+
+		bBufferAdded = true;
+	}
 
 	UpdateTaskStatus( in_eIOResult );
 
@@ -631,6 +608,8 @@ void CAkStdStmBlocking::Update(
 	// Tell profiler that it can reset the "active" bit if it doesn't require scheduling anymore.
 	m_bCanClearActiveProfile = !m_bRequiresScheduling;
 #endif
+
+	return bBufferAdded;
 }
 
 //-----------------------------------------------------------------------------
@@ -664,11 +643,13 @@ bool CAkAutoStmBlocking::CanBeDestroyed()
 CAkStmMemView * CAkAutoStmBlocking::PrepareTransfer( 
     AkFileDesc *&			out_pFileDesc,		// Stream's associated file descriptor.
 	CAkLowLevelTransfer *&	out_pLowLevelXfer,	// Low-level transfer. Set to NULL if it doesn't need to be pushed to the Low-Level IO.
+	bool &					out_bExistingLowLevelXfer, // Always false on the blocking device.
 	bool					in_bCacheOnly		// Prepare transfer only if data is found in cache. out_pLowLevelXfer will be NULL.
 	)
 {
 	out_pFileDesc = m_pFileDesc;
 	out_pLowLevelXfer = NULL;
+	out_bExistingLowLevelXfer = false;
 
     // Lock status.
     AkAutoLock<CAkLock> atomicPosition( m_lockStatus );
@@ -683,6 +664,10 @@ CAkStmMemView * CAkAutoStmBlocking::PrepareTransfer(
 	AkUInt32 uRequestedSize;
 	bool bEof;
 	GetPositionForNextTransfer( uFilePosition, uRequestedSize, bEof );
+
+	//Is is possible for caching streams to be exactly at the end of their prefetch buffer.
+	if (uRequestedSize == 0)
+		return NULL;
 
 	// Get IO buffer.
 	CAkStmMemView * pMemView = ((CAkDeviceBlocking*)m_pDevice)->CreateMemViewAuto(
@@ -718,12 +703,14 @@ CAkStmMemView * CAkAutoStmBlocking::PrepareTransfer(
 
 // Update stream object after I/O.
 // Sync: Locks stream's status.
-void CAkAutoStmBlocking::Update(
+bool CAkAutoStmBlocking::Update(
 	CAkStmMemView *	in_pTransfer,	// Logical transfer object.
 	AKRESULT		in_eIOResult,	// AK_Success if IO was successful, AK_Cancelled if IO was cancelled, AK_Fail otherwise.
 	bool			in_bRequiredLowLevelXfer	// True if this transfer required a call to low-level.
     )
 {
+	bool bBufferAdded = false;
+
 	// Lock status.
     AkAutoLock<CAkLock> update( m_lockStatus );
 
@@ -739,10 +726,12 @@ void CAkAutoStmBlocking::Update(
 
 		// "Remove" data ref from current transfer and enqueue it in buffer list.
 		AddMemView( in_pTransfer, bStoreData );
-	}
 
-	m_pCurrentTransfer = NULL;
-	m_bTransferCancelled = false;
+		m_pCurrentTransfer = NULL;
+		m_bTransferCancelled = false;
+
+		bBufferAdded = true;
+	}
 	
 	UpdateTaskStatus( in_eIOResult );
 
@@ -750,6 +739,8 @@ void CAkAutoStmBlocking::Update(
 	// Tell profiler that it can reset the "active" bit if it doesn't require scheduling anymore.
 	m_bCanClearActiveProfile = !m_bRequiresScheduling;
 #endif
+
+	return bBufferAdded;
 }
 
 // Automatic streams must implement a method that returns the file position after the last
@@ -820,8 +811,6 @@ void CAkAutoStmBlocking::FlushSmallBuffersAndPendingTransfers(
 				else
 					++it;
 			}
-			if ( bFlush )
-				m_pDevice->NotifyMemChange();
 		}
 	}
 
@@ -833,6 +822,21 @@ void CAkAutoStmBlocking::FlushSmallBuffersAndPendingTransfers(
 			CancelCurrentTransfer();
 		}
 	}
+}
+
+AkUInt32 CAkAutoStmBlocking::ReleaseCachingBuffers(AkUInt32 in_uTargetMemToRecover)
+{
+	AkUInt32 uMemFreed = 0;
+	if ( uMemFreed < in_uTargetMemToRecover && m_pCurrentTransfer )
+	{
+		uMemFreed += m_pCurrentTransfer->Size();
+		CancelCurrentTransfer();
+	}
+
+	// Try to release more memory from the list of buffers by using the base class implementation
+	uMemFreed += CAkAutoStmBase::ReleaseCachingBuffers(in_uTargetMemToRecover-uMemFreed);
+
+	return uMemFreed;
 }
 
 // Change loop end heuristic. Use this function instead of setting m_uLoopEnd directly because

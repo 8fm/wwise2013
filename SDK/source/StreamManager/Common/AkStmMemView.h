@@ -58,6 +58,7 @@ namespace StreamMgr
 		//
 		inline void * Buffer() { return (AkUInt8*)(m_pBlock->pData) + m_uOffsetInBlock; }
 		inline AkUInt32 Size() { AKASSERT( m_pBlock->uAvailableSize >= m_uOffsetInBlock ); return m_pBlock->uAvailableSize - m_uOffsetInBlock; }
+		inline AkUInt32 AllocSize() { return m_pBlock->uAllocSize; }
 		inline AkUInt64 StartPosition() { return m_pBlock->uPosition + m_uOffsetInBlock; }
 		inline AkUInt64 EndPosition() { return m_pBlock->uPosition + m_pBlock->uAvailableSize; }
 
@@ -111,9 +112,10 @@ namespace StreamMgr
     };
 
 	// Next item policy for bare lists.
+	template <class T>
 	struct AkListBareNextMemView
 	{
-		static AkForceInline CAkStmMemView *& Get( CAkStmMemView * in_pItem ) 
+		static AkForceInline T *& Get( T * in_pItem ) 
 		{
 			return in_pItem->pNextView;
 		}

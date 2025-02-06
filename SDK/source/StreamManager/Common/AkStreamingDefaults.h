@@ -36,6 +36,6 @@
 #define AK_DEFAULT_DEVICE_BUFFERING_LENGTH	(380.f)			// 380 ms. 
 #define AK_DEFAULT_MAX_CONCURRENT_IO		(8)				// 8. With AK_SCHEDULER_BLOCKING, it is always 1 anyway. Default is arbitrarily set to 8 for deferred device.
 
-#define AK_DEFAULT_DEVICE_MAX_CACHE_RATIO	(1.f)			// Caching is disabled by default.
+#define AK_DEFAULT_DEVICE_CACHE_ENABLED	(false)			// Caching is disabled by default.
 
 #endif //_STREAMING_DEFAULTS_H_

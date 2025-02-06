@@ -203,6 +203,7 @@ namespace StreamMgr
 		// Synchronization objects for blocking I/O.
 		pthread_mutex_t		m_mutexBlockingIO;
 		pthread_cond_t		m_condBlockingIODone;
+		AkThreadProperties	m_threadProperties;
 
         // Stop condition.
         bool			m_bDoRun;

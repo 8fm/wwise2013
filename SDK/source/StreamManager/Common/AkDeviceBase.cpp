@@ -11,7 +11,6 @@
 #include "stdafx.h"
 #include "AkDeviceBase.h"
 #include "AkStreamingDefaults.h"
-#include <AK/Tools/Common/AkAutoLock.h>
 #include <AK/Tools/Common/AkPlatformFuncs.h>
 #ifdef AK_SUPPORT_WCHAR
 #include <wchar.h>
@@ -26,7 +25,7 @@ using namespace AK::StreamMgr;
 //-------------------------------------------------------------------
 
 #define AK_MINIMAL_THROUGHPUT	(1.f)    // 1 byte/second.
-
+#define AK_CACHING_STREAM_MIN_BUFFER_SIZE (2048) //See AK_WORST_CASE_MIN_STREAM_BUFFER_SIZE in AkSrcFileBase.h
 
 //-------------------------------------------------------------------
 // CAkDeviceBase implementation.
@@ -37,13 +36,16 @@ CAkDeviceBase::CAkDeviceBase(
 	IAkLowLevelIOHook *	in_pLowLevelHook
 	)
 : m_pLowLevelHook( in_pLowLevelHook )
-, m_pStmMemViewMem( NULL )
+, m_uMaxCachePinnedBytes(AkUInt32(-1))
+, m_uCurrentCachePinnedData(0)
 #ifndef AK_OPTIMIZED
 , m_uNumActiveStreams( 0 )
-, m_uNumBytesTransferredFromLowLevel( 0 )
-, m_uTotalBytesTransferred( 0 )
+, m_uBytesLowLevelThisInterval( 0 )
+, m_uBytesThisInterval( 0 )
 , m_uNumLowLevelRequests( 0 )
 , m_uNumLowLevelRequestsCancelled( 0 )
+, m_uBytesThisSession(0)
+, m_uCacheBytesThisSession(0)
 , m_bIsMonitoring( false )
 , m_bIsNew( true )
 #endif
@@ -84,7 +86,9 @@ AKRESULT CAkDeviceBase::Init(
 	
 	m_deviceID				= in_deviceID;
 
-	if ( m_mgrMemIO.Init( in_settings ) != AK_Success )
+	m_uMaxCachePinnedBytes = in_settings.uMaxCachePinnedBytes;
+
+	if ( m_mgrMemIO.Init( in_settings, this ) != AK_Success )
 	{
 		AKASSERT( !"Failed creating IO memory manager." );
 		return AK_Fail;
@@ -98,32 +102,6 @@ AKRESULT CAkDeviceBase::Init(
 void CAkDeviceBase::Destroy()
 {
 	CAkIOThread::Term();
-
-	// Free mem view pool.
-	if ( m_pStmMemViewMem )
-	{
-		if ( m_mgrMemIO.UseCache() )
-		{
-			// Because we might have allocated new stream views if we ended up not having enough, we need to go through
-			// the list and perform checks on each block.
-			AkStmMemViewListLight::IteratorEx it = m_poolStmMemView.BeginEx();
-			while ( it != m_poolStmMemView.End() )
-			{
-				if ( !(*it)->IsCachedAlloc() )
-				{
-					CAkStmMemView * pMemView = (*it);
-					it = m_poolStmMemView.Erase( it );
-					AkDelete( CAkStreamMgr::GetObjPoolID(), pMemView );
-				}
-				else
-					it = m_poolStmMemView.Erase( it );
-			}
-		}
-		else
-			m_poolStmMemView.RemoveAll();
-		AkFree( CAkStreamMgr::GetObjPoolID(), m_pStmMemViewMem );
-	}
-	m_poolStmMemView.Term();
 
 #ifndef AK_OPTIMIZED
     m_arStreamProfiles.Term();
@@ -139,18 +117,97 @@ AkDeviceID CAkDeviceBase::GetDeviceID()
     return m_deviceID;
 }
 
+CAkStmTask * CAkDeviceBase::CreateStd(
+	AkFileDesc *				in_pFileDesc,		// Low-level IO file descriptor.
+	AkOpenMode					in_eOpenMode,       // Open mode (read, write, ...).
+	IAkStdStream *&				out_pStream         // Returned interface to a standard stream.    
+	)
+{
+	CAkStmTask * pNewStm = _CreateStd(
+		in_pFileDesc,
+		in_eOpenMode,
+		out_pStream
+		);
+
+	if (pNewStm)
+	{
+		AddTask( pNewStm, m_listTasks );
+	}
+
+	return pNewStm;
+}
+
+CAkStmTask * CAkDeviceBase::CreateAuto(
+	AkFileDesc *				in_pFileDesc,		// Low-level IO file descriptor.
+	AkFileID					in_fileID,			// Application defined ID. Pass AK_INVALID_FILE_ID if unknown.
+	const AkAutoStmHeuristics & in_heuristics,      // Streaming heuristics.
+	AkAutoStmBufSettings *      in_pBufferSettings, // Stream buffer settings. Pass NULL to use defaults (recommended).
+	IAkAutoStream *&            out_pStream         // Returned interface to an automatic stream.
+	)
+{
+	CAkStmTask * pNewStm = _CreateAuto(
+		in_pFileDesc,		
+		in_fileID,			
+		in_heuristics,      
+		in_pBufferSettings, 
+		out_pStream );
+
+	if (pNewStm)
+	{
+		AddTask( pNewStm, m_listTasks );
+	}
+
+	return pNewStm;
+}
+
+CAkStmTask * CAkDeviceBase::CreateCachingStream(
+	AkFileDesc *				in_pFileDesc,		// Low-level IO file descriptor.
+	AkFileID					in_fileID,			// Application defined ID. Pass AK_INVALID_FILE_ID if unknown.
+	AkUInt32					in_uNumBytesPrefetch,
+	AkPriority					in_uPriority,
+	IAkAutoStream *&            out_pStream         // Returned interface to an automatic stream.
+	)
+{
+	AkAutoStmHeuristics heuristics;
+	heuristics.uMinNumBuffers = 0; 
+	heuristics.fThroughput = 0;//will be set below
+	heuristics.uLoopStart = 0;
+	heuristics.uLoopEnd = 0;
+	heuristics.priority = in_uPriority;
+
+	CAkStmTask * pTask = _CreateAuto(in_pFileDesc, in_fileID, heuristics, NULL, out_pStream);
+
+	if (pTask)
+	{
+ 		AKASSERT(out_pStream);
+		pTask->SetIsCachingStream();
+		pTask->SetCachingBufferSize( in_uNumBytesPrefetch );
+		
+		AddTask(pTask, m_listCachingTasks);
+	}
+
+	return pTask;
+}
+
 // Destroys all streams remaining to be destroyed.
 bool CAkDeviceBase::ClearStreams()
 {
-	TaskList::IteratorEx it = m_listTasks.BeginEx();
-	while ( it != m_listTasks.End() )
+	bool emptyTasks			= ClearTaskList( m_listTasks );
+	bool emptyCachingTasks	= ClearTaskList( m_listCachingTasks );
+	return emptyTasks && emptyCachingTasks;
+}
+
+bool CAkDeviceBase::ClearTaskList(TaskList& in_listTasks)
+{
+	TaskList::IteratorEx it = in_listTasks.BeginEx();
+	while ( it != in_listTasks.End() )
 	{
 		CAkStmTask * pTask = (*it);
 		if ( pTask->IsToBeDestroyed() )
 		{
 			if ( pTask->CanBeDestroyed() )
 			{
-				it = m_listTasks.Erase( it );
+				it = in_listTasks.Erase( it );
 				pTask->InstantDestroy();
 			}
 			else
@@ -167,9 +224,9 @@ bool CAkDeviceBase::ClearStreams()
 		}
 	}
 
-	if ( m_listTasks.IsEmpty() )
+	if ( in_listTasks.IsEmpty() )
 	{
-		m_listTasks.Term();
+		in_listTasks.Term();
 		return true;
 	}
 	return false;
@@ -185,12 +242,13 @@ void CAkDeviceBase::OnThreadStart()
 // Helper: adds a new task to the list.
 // Sync: task list lock.
 void CAkDeviceBase::AddTask( 
-    CAkStmTask * in_pStmTask
+    CAkStmTask * in_pStmTask,
+	TaskList& in_listToAddTo
     )
 {
     AkAutoLock<CAkLock> gate( m_lockTasksList );
     
-    m_listTasks.AddFirst( in_pStmTask );
+    in_listToAddTo.AddFirst( in_pStmTask );
 
 #ifndef AK_OPTIMIZED
     // Compute and assign a new unique stream ID.
@@ -198,6 +256,120 @@ void CAkDeviceBase::AddTask(
 		CAkStreamMgr::GetNewStreamID() // Gen stream ID.
         );
 #endif
+}
+
+void CAkDeviceBase::UpdateCachingPriority(CAkAutoStmBase * in_pStream, AkPriority in_uNewPriority)
+{
+	AkPriority uOldPriority = in_pStream->Priority();
+
+	if (uOldPriority != in_uNewPriority)
+	{
+		AkAutoStmHeuristics heuristics;
+		in_pStream->GetHeuristics(heuristics);
+		heuristics.priority = in_uNewPriority;
+		in_pStream->SetHeuristics(heuristics);
+
+		// Restart all the tasks to re-evaluate the priorities.
+			AkAutoLock<CAkLock> scheduling( m_lockTasksList );
+			for ( TaskList::IteratorEx it = m_listCachingTasks.BeginEx(); it != m_listCachingTasks.End(); ++it )
+			{
+				CAkStmTask * pTask = (*it);
+					pTask->StartCaching();
+				}
+			}
+
+}
+
+CAkStmTask * CAkDeviceBase::SchedulerFindNextCachingTask()
+{
+	CAkStmTask * pTaskToSchedule = NULL;
+
+	AkAutoLock<CAkLock> scheduling( m_lockTasksList );
+
+	AkUInt32 uCurrentCachePinned = 0;
+	bool bStreamDestroyed = false;
+
+	TaskList::IteratorEx it = m_listCachingTasks.BeginEx();
+	while ( it != m_listCachingTasks.End() )
+	{
+		if ( (*it)->IsToBeDestroyed() && (*it)->CanBeDestroyed() )
+		{
+			CAkStmTask * pTaskToDestroy = (*it);
+			it = m_listCachingTasks.Erase( it );
+			pTaskToDestroy->InstantDestroy();
+			bStreamDestroyed = true;
+		}
+		else
+		{
+			uCurrentCachePinned += (*it)->GetVirtualBufferingSize();
+			++it;
+		}
+	}
+	
+	// Find the highest priority task that has been serviced the least recently.
+	for (TaskList::IteratorEx it = m_listCachingTasks.BeginEx(); it != m_listCachingTasks.End(); ++it )
+	{
+		if ( bStreamDestroyed ) 
+		{
+			// A stream was destroyed.  Start any caching streams that may have been stopped 
+			//	due to hitting the memory limit. We may be able to fit them in now.
+			(*it)->StartCaching();
+		}
+
+		if ( (*it)->RequiresScheduling() )
+		{
+			// Choose task with highest priority to schedule
+			if ( !pTaskToSchedule || (*it)->Priority() > pTaskToSchedule->Priority() )
+			{
+				pTaskToSchedule = (*it);
+			}
+		}
+	}
+	
+	if ( pTaskToSchedule != NULL )
+	{
+		//Now check to see that if the amount of memory needed fits under our cache locked memory limit.
+		AkUInt32 uMemNeededForTask = pTaskToSchedule->GetNominalBuffering() - pTaskToSchedule->GetVirtualBufferingSize();
+
+		if ((uCurrentCachePinned + uMemNeededForTask) > m_uMaxCachePinnedBytes )
+		{
+			// Choose task with lowest priority to bump, if possible
+			CAkStmTask * pTaskToBump;
+			do
+			{
+				pTaskToBump = NULL;
+				for (TaskList::IteratorEx it = m_listCachingTasks.BeginEx(); it != m_listCachingTasks.End(); ++it )
+				{
+					if ( (*it)->GetVirtualBufferingSize() > 0 &&
+						(	( (*it)->Priority() < pTaskToSchedule->Priority() ) &&
+							( !pTaskToBump || (*it)->Priority() < pTaskToBump->Priority() )
+						 ) )
+					{
+						pTaskToBump = (*it);
+					}
+				}
+
+				if (pTaskToBump)
+				{
+					uCurrentCachePinned -= pTaskToBump->StopCaching(uMemNeededForTask);
+					if ( (uCurrentCachePinned + uMemNeededForTask) <= m_uMaxCachePinnedBytes )
+						break; //we have enough free space
+				}
+			}
+			while ( pTaskToBump != NULL );
+
+			// If we could not free enough memory, do not schedule a new task 
+			if ( (uCurrentCachePinned + uMemNeededForTask) > m_uMaxCachePinnedBytes  )
+			{
+				pTaskToSchedule->StopCaching(0);
+				pTaskToSchedule = NULL;
+			}
+		}
+	}
+
+	m_uCurrentCachePinnedData = uCurrentCachePinned;
+
+	return pTaskToSchedule;
 }
 
 ////////////////////////////////////////
@@ -269,7 +441,7 @@ CAkStmTask * CAkDeviceBase::SchedulerFindNextTask(
     if ( !pTask )
     {
         // No task was ready for I/O. Leave.
-        return NULL;
+        return SchedulerFindNextCachingTask();
     }
 
     // Find task with smallest effective deadline.
@@ -366,7 +538,7 @@ CAkStmTask * CAkDeviceBase::SchedulerFindNextTask(
 
 	if ( bLeastBufferedTaskRequiresScheduling )
 	    return pTask;
-	return NULL;
+	return SchedulerFindNextCachingTask();
 }
 
 // Scheduler algorithm: standard stream-only version.
@@ -490,17 +662,27 @@ CAkStmTask * CAkDeviceBase::ScheduleStdStmOnly(
 
 }
 
-// Forces the device to clean up dead tasks. 
 void CAkDeviceBase::ForceCleanup(
+								 bool in_bKillLowestPriorityTask,				// True if the device should kill the task with lowest priority.
+								 AkPriority in_priority							// Priority of the new task if applicable. Pass AK_MAX_PRIORITY to ignore.
+								 )
+{
+	bool cachingTaskKilled = ForceTaskListCleanup( in_bKillLowestPriorityTask, in_priority, m_listCachingTasks );
+	ForceTaskListCleanup( in_bKillLowestPriorityTask && !cachingTaskKilled, in_priority, m_listTasks );
+}
+
+// Forces the device to clean up dead tasks. 
+bool CAkDeviceBase::ForceTaskListCleanup(
 	bool in_bKillLowestPriorityTask,				// True if the device should kill the task with lowest priority.
-	AkPriority in_priority							// Priority of the new task if applicable. Pass AK_MAX_PRIORITY to ignore.
+	AkPriority in_priority,							// Priority of the new task if applicable. Pass AK_MAX_PRIORITY to ignore.
+	TaskList& in_listTasks
 	)
 {
 	AkAutoLock<CAkLock> scheduling( m_lockTasksList );
 
 	CAkStmTask * pTaskToKill = NULL;
-	TaskList::IteratorEx it = m_listTasks.BeginEx();
-    while ( it != m_listTasks.End() )
+	TaskList::IteratorEx it = in_listTasks.BeginEx();
+    while ( it != in_listTasks.End() )
     {
         // Cleanup while we're at it.
         if ( (*it)->IsToBeDestroyed() )
@@ -509,7 +691,7 @@ void CAkDeviceBase::ForceCleanup(
 			{
 				// Clean up.
 				CAkStmTask * pTaskToDestroy = (*it);
-	            it = m_listTasks.Erase( it );
+	            it = in_listTasks.Erase( it );
 				pTaskToDestroy->InstantDestroy();
 	        }
 			else
@@ -535,16 +717,45 @@ void CAkDeviceBase::ForceCleanup(
 
 	// Kill the task if any.
 	if ( pTaskToKill )
+	{
 		pTaskToKill->Kill();
+		return true;
+	}
+
+	return false;
 }
 
 // Cache management.
 void CAkDeviceBase::FlushCache()
 {
 	AkAutoLock<CAkIOThread> lock( *this );
-	m_mgrMemIO.UntagAllBlocks();
+	m_mgrMemIO.FlushCache();
 }
 
+// Perform a direct transfer from the cache, from client thread.
+// Sync: task must be locked. Device is locked herein.
+bool CAkDeviceBase::ExecuteCachedTransfer( CAkStmTask * in_pTask )
+{
+	AKASSERT( in_pTask != NULL );
+
+	AkAutoLock<CAkIOThread> lock(*this);
+
+	// Get info for IO.
+	AkFileDesc * pFileDesc;
+	CAkLowLevelTransfer * pNewLowLevelXfer;
+	bool bTrasferExists;
+	CAkStmMemView * pMemView = in_pTask->PrepareTransfer( 
+		pFileDesc, 
+		pNewLowLevelXfer,
+		bTrasferExists,
+		true );
+	
+	AKASSERT( !pNewLowLevelXfer || !"Asked for cached transfer only" );
+	AKASSERT( !pMemView || !bTrasferExists || !"PrepareTransfer() should only return mem views that do not have pending transfers.");
+
+	// Update task after transfer.  Returns true if buffer was added
+	return in_pTask->Update(pMemView, AK_Success, false);
+}
 
 // Device Profile Ex interface.
 // --------------------------------------------------------
@@ -576,18 +787,34 @@ void CAkDeviceBase::GetData(
     AkDeviceData &  out_deviceData
     )
 {
+	AkAutoLock<CAkIOThread> lock(*this);
+
 	m_mgrMemIO.GetProfilingData( m_uGranularity, out_deviceData );
 	out_deviceData.deviceID = m_deviceID;
 	out_deviceData.uGranularity = m_uGranularity;
 	out_deviceData.uNumActiveStreams = m_uNumActiveStreams;
-	out_deviceData.uTotalBytesTransferred = m_uTotalBytesTransferred;
-	out_deviceData.uLowLevelBytesTransferred = m_uNumBytesTransferredFromLowLevel;
+	out_deviceData.uTotalBytesTransferred = m_uBytesThisInterval;
+	out_deviceData.uLowLevelBytesTransferred = m_uBytesLowLevelThisInterval;
+	
+	m_uBytesThisSession += m_uBytesThisInterval;
+	AKASSERT( m_uBytesThisInterval >= m_uBytesLowLevelThisInterval );
+	m_uCacheBytesThisSession += (m_uBytesThisInterval - m_uBytesLowLevelThisInterval);
+	AKASSERT( m_uCacheBytesThisSession <= m_uBytesThisSession );
+
+	out_deviceData.fAvgCacheEfficiency = 0.f;
+	if (m_uBytesThisSession > 0)
+		out_deviceData.fAvgCacheEfficiency = ((AkReal32)m_uCacheBytesThisSession / (AkReal32)m_uBytesThisSession) * 100.f;
+	
+	AKASSERT(out_deviceData.fAvgCacheEfficiency >= 0.f && out_deviceData.fAvgCacheEfficiency <= 100.f);
+
 	out_deviceData.uNumLowLevelRequestsCompleted = m_uNumLowLevelRequests;
 	out_deviceData.uNumLowLevelRequestsCancelled = m_uNumLowLevelRequestsCancelled;
-	out_deviceData.uNumLowLevelRequestsPending = GetNumConcurrentIO();
+	out_deviceData.uNumLowLevelRequestsPending = AkMin(m_uMaxConcurrentIO,GetNumConcurrentIO());
 	out_deviceData.uCustomParam = m_pLowLevelHook->GetDeviceData();
-	m_uNumBytesTransferredFromLowLevel = 0;
-	m_uTotalBytesTransferred = 0;
+	out_deviceData.uCachePinnedBytes = m_uCurrentCachePinnedData;
+	
+	m_uBytesLowLevelThisInterval = 0;
+	m_uBytesThisInterval = 0;
 	m_uNumLowLevelRequests = 0;
 	m_uNumLowLevelRequestsCancelled = 0;
 }
@@ -607,10 +834,14 @@ AKRESULT CAkDeviceBase::StartMonitoring( )
 {
     m_bIsMonitoring = true;
 	// Reset transfer statistics.
-	m_uNumBytesTransferredFromLowLevel	= 0;
-	m_uTotalBytesTransferred = 0;
+	m_uBytesLowLevelThisInterval	= 0;
+	m_uBytesThisInterval = 0;
 	m_uNumLowLevelRequests = 0;
 	m_uNumLowLevelRequestsCancelled = 0;
+
+	m_uBytesThisSession = 0;
+	m_uCacheBytesThisSession = 0;
+
     return AK_Success;
 }
 
@@ -627,14 +858,22 @@ void CAkDeviceBase::StopMonitoring( )
 // by IAkStreamProfile methods.
 AkUInt32 CAkDeviceBase::GetNumStreams()
 {
-    m_arStreamProfiles.RemoveAll();
+	m_arStreamProfiles.RemoveAll();
 
 	m_uNumActiveStreams = 0;
 
-    AkAutoLock<CAkLock> gate( m_lockTasksList );
+	AkAutoLock<CAkLock> gate( m_lockTasksList );
 
-    TaskList::Iterator it = m_listTasks.Begin();
-    while ( it != m_listTasks.End() )
+	CountStreamsInTaskList(m_listTasks);
+	CountStreamsInTaskList(m_listCachingTasks);
+
+	return m_arStreamProfiles.Length();
+}
+
+void CAkDeviceBase::CountStreamsInTaskList(TaskList& in_listTasks)
+{
+    TaskList::Iterator it = in_listTasks.Begin();
+    while ( it != in_listTasks.End() )
     {
         // Profiler will let the device destroy this stream if it is not "new" (was already
 		// read). If it is ready to be destroyed and not new, it could be because the file could not 
@@ -645,7 +884,7 @@ AkUInt32 CAkDeviceBase::GetNumStreams()
 		{
 			(*it)->ProfileAllowDestruction();
 		}
-        else if ( (*it)->IsProfileReady() )
+        else
         {
             // Copy into profiler list.
             m_arStreamProfiles.AddLast( (*it)->GetStreamProfile() );
@@ -655,7 +894,7 @@ AkUInt32 CAkDeviceBase::GetNumStreams()
 
         ++it;
     }
-    return m_arStreamProfiles.Length();
+    
 }
 
 // Note. The following functions refer to streams by index, which must honor the call to GetNumStreams().
@@ -692,6 +931,7 @@ CAkStmTask::CAkStmTask()
 , m_bIsToBeDestroyed( false )
 , m_bIsFileOpen( false )
 , m_bRequiresScheduling( false )
+, m_bIsCachingStream( false )
 , m_bIsReadyForIO( false )
 #ifndef AK_OPTIMIZED
 , m_bIsNew( true )
@@ -845,6 +1085,7 @@ void CAkStmTask::GetStreamRecord(
 	out_streamRecord.uCustomParamSize = m_pFileDesc->uCustomParamSize;
 	out_streamRecord.uCustomParam = (AkUInt32)(AkUIntPtr)m_pFileDesc->pCustomParam;
 	out_streamRecord.bIsAutoStream = m_bIsAutoStm;
+	out_streamRecord.bIsCachingStream = IsCachingStream();
 }
 #endif
 
@@ -1297,7 +1538,7 @@ void CAkStdStmBase::AddMemView(
 		AKASSERT( in_pMemView->Status() != CAkStmMemView::TransferStatus_Ready 
 				|| !"Standard streams cannot use cache data" );
 		if ( m_pDevice->IsMonitoring() )
-			m_pDevice->PushTransferStatistics( uTransferSize );
+			m_pDevice->PushTransferStatistics( uTransferSize, true );
 #endif
 
 		m_pDevice->DestroyMemView( &m_memBlock, in_pMemView );
@@ -1355,6 +1596,8 @@ void CAkStdStmBase::GetStreamData(
     AkStreamData & out_streamData
     )
 {
+	AkAutoLock<CAkLock> stmBufferGate(m_lockStatus);
+
     out_streamData.uStreamID = m_uStreamID;
     // Note. Priority appearing in profiler will be that which was used in last operation. 
     out_streamData.uPriority = m_priority;
@@ -1365,11 +1608,11 @@ void CAkStdStmBase::GetStreamData(
 	out_streamData.uNumBytesTransferedLowLevel = m_uBytesTransfered;
     m_uBytesTransfered = 0;    // Reset.
 	out_streamData.uMemoryReferenced = 0;
+	out_streamData.uBufferedSize = 0;
 	out_streamData.fEstimatedThroughput = ( m_fDeadline > 0 ) ? m_memBlock.uAvailableSize / m_fDeadline : 0.f;
 	out_streamData.bActive = m_bWasActive;
 	if ( m_bCanClearActiveProfile )
 	{
-		AkAutoLock<CAkLock> stmBufferGate( m_lockStatus );
 		m_bWasActive = false;
 	}
 }
@@ -1455,6 +1698,7 @@ CAkAutoStmBase::CAkAutoStmBase()
 , m_uNextToGrant( 0 )
 , m_bIsRunning( false )
 , m_bIOError( false )
+, m_bCachingReady( false )
 {
 	m_bIsAutoStm = true;
 	m_bIsWriteOp = false;
@@ -1800,8 +2044,6 @@ AKRESULT CAkAutoStmBase::SetHeuristics(
 				itRemove = listToRemove.Erase( itRemove );
 				DestroyBuffer( pMemView );
 			}
-
-			m_pDevice->NotifyMemChange();
 		}
 
 		listToRemove.Term();
@@ -1857,6 +2099,7 @@ AKRESULT CAkAutoStmBase::SetMinimalBufferSize(
 			// Now that buffering constraints have been changed, pass through buffer list and flush everything
 			// after an invalid buffer size.
 			FlushSmallBuffersAndPendingTransfers( in_uMinBufferSize );
+			UpdateSchedulingStatus();
 		}
 	}
 	else
@@ -1909,6 +2152,10 @@ AKRESULT CAkAutoStmBase::Start()
 			AkAutoLock<CAkLock> status( m_lockStatus );
 			SetRunning( true );
 			UpdateSchedulingStatus();
+			m_bCachingReady = true;
+			
+			// Reset time. Time count since last transfer starts now.
+			m_iIOStartTime = m_pDevice->GetTime();
 		}
 
         // The scheduler should reevaluate memory usage. Notify it.
@@ -1916,10 +2163,8 @@ AKRESULT CAkAutoStmBase::Start()
 			AkAutoLock<CAkIOThread> lock( *m_pDevice );
 	        m_pDevice->NotifyMemChange();
 		}
+	}
 
-        // Reset time. Time count since last transfer starts now.
-        m_iIOStartTime = m_pDevice->GetTime();
-    }
     return m_bIOError ? AK_Fail : AK_Success;
 }
 
@@ -2163,9 +2408,6 @@ AKRESULT CAkAutoStmBase::ReleaseBuffer()
 			
 			AKVERIFY( m_listBuffers.RemoveFirst() == AK_Success );
 			m_pDevice->DestroyMemView( pFirst );
-			
-			// Memory was released. Signal it.
-			m_pDevice->NotifyMemChange();
 		}
         
         // Update "next to grant" index.
@@ -2178,6 +2420,64 @@ AKRESULT CAkAutoStmBase::ReleaseBuffer()
 
 	// Failure: Buffer was not found or not granted.
 	return AK_Fail;
+}
+
+//Return true if more data needs to be requested
+AkUInt32 CAkAutoStmBase::GetVirtualBufferingSize()
+{
+	return m_uVirtualBufferingSize;
+}
+
+void CAkAutoStmBase::StartCaching()
+{
+	if ( m_bCachingReady )
+		Start();
+}
+
+AkUInt32 CAkAutoStmBase::StopCaching(AkUInt32 in_uMemNeededForTask)
+{
+	// Lock status.
+	AkAutoLock<CAkLock> status( m_lockStatus );
+
+	AkUInt32 uMemFreed = ReleaseCachingBuffers(in_uMemNeededForTask);
+
+	SetRunning( false );
+	UpdateSchedulingStatus();
+
+#ifndef AK_OPTIMIZED
+	//Prevent stopped caching streams from appearing as active in the profiler.
+	m_bCanClearActiveProfile = true;
+#endif
+
+	return uMemFreed;
+}
+
+void CAkAutoStmBase::SetCachingBufferSize(AkUInt32 in_uNumBytes)
+{
+	in_uNumBytes = AkMax( AK_CACHING_STREAM_MIN_BUFFER_SIZE, (((in_uNumBytes - 1) / m_uBufferAlignment) + 1 ) * m_uBufferAlignment );
+	m_fThroughput = in_uNumBytes / m_pDevice->GetTargetAutoStmBufferLength();
+}
+
+AkUInt32 CAkAutoStmBase::ReleaseCachingBuffers(AkUInt32 in_uTargetMemToRecover)
+{
+	AkUInt32 uMemFreed = 0;
+	
+	if ( uMemFreed < in_uTargetMemToRecover && m_listBuffers.Length() > 0 )
+	{
+		AkAutoLock<CAkIOThread> lock( *m_pDevice ); 		// Lock scheduler for memory change.
+
+		CAkStmMemView * pLast = m_listBuffers.Last();
+		while (pLast != NULL && uMemFreed < in_uTargetMemToRecover) 
+		{
+			uMemFreed += pLast->Size();
+			AKVERIFY( m_listBuffers.Remove(pLast) );
+			DestroyBuffer( pLast );
+
+			pLast = m_listBuffers.Last();
+		}
+	}
+
+	return uMemFreed;
 }
 
 // Get the amount of buffering that the stream has. 
@@ -2194,40 +2494,59 @@ AKRESULT CAkAutoStmBase::QueryBufferingStatus( AkUInt32 & out_uNumBytesAvailable
 	// Lock status to query buffering.
 	AkAutoLock<CAkLock> stmBufferGate( m_lockStatus );
 
+	if ( AK_EXPECT_FALSE( !m_bIsFileOpen ) )
+		return AK_NoDataReady;
+
 	AKRESULT eRetCode;
-	out_uNumBytesAvailable = 0;
-
-	AKASSERT( m_listBuffers.Length() >= m_uNextToGrant );
-	if ( m_uNextToGrant < m_listBuffers.Length() )
+	bool bBufferingReady;
+	do 
 	{
-		eRetCode = AK_DataReady;
+		eRetCode = CalcUnconsumedBufferSize( out_uNumBytesAvailable );
 
-		// Compute the amount of data that is available.
-		AkUInt32 uIdx = 0;
-		AkBufferList::Iterator it = m_listBuffers.Begin();
-		while ( uIdx < m_uNextToGrant )
-	    {
-			++uIdx;
-			++it;
-		}
-		while ( it != m_listBuffers.End() )
-		{
-			out_uNumBytesAvailable += (*it)->Size();
-			++it;
-		}
-	}
-	else
-	{
-		// No data is available.
-		eRetCode = AK_NoDataReady;
-	}
+		// Try to see if it is readily available in cache as long is it needs more data. 
+		bBufferingReady = NeedsNoMoreTransfer( out_uNumBytesAvailable );
 
+	} while ( 
+		!bBufferingReady
+		&& m_pDevice->ExecuteCachedTransfer( this ) );
+
+	
 	// Deal with end of stream: return AK_NoMoreData if we are not going to stream in any more data,
 	// or if the device currently cannot stream in anymore data. Clients must be aware that the device
 	// is idle to avoid hangs.
-	if ( NeedsNoMoreTransfer( out_uNumBytesAvailable ) 
+	if ( bBufferingReady
 		|| m_pDevice->CannotScheduleAutoStreams() )
+	{
 		eRetCode = AK_NoMoreData;
+	}
+
+	return eRetCode;
+}
+
+AKRESULT CAkAutoStmBase::CalcUnconsumedBufferSize(AkUInt32 & out_uNumBytesAvailable)
+{
+	AKRESULT eRetCode = AK_NoDataReady;
+
+	out_uNumBytesAvailable = 0;
+
+	// Skip granted buffers.
+	AkBufferList::Iterator it = m_listBuffers.Begin();
+	AkUInt32 uIdx = 0;
+	AKASSERT( m_uNextToGrant <= m_listBuffers.Length() );
+	AkUInt32 uSkip = m_uNextToGrant;
+	while ( uIdx < uSkip )
+	{
+		++uIdx;
+		++it;
+	}
+
+	// Count in buffers that are already there.
+	while ( it != m_listBuffers.End() )
+	{
+		out_uNumBytesAvailable += (*it)->Size();
+		eRetCode = AK_DataReady;
+		++it;
+	}
 
 	return eRetCode;
 }
@@ -2282,15 +2601,16 @@ void CAkAutoStmBase::AddMemView(
 
 		// Profiling. 
 #ifndef AK_OPTIMIZED
-		m_uBytesTransfered += uTransferSize;
-		if ( in_pMemView->Status() != CAkStmMemView::TransferStatus_Ready )
-			m_uBytesTransferedLowLevel += uTransferSize;	// Was not already ready: required low-level transfer.
-
-		// Push transfer statistics only if monitoring, as this requires unwanted locking.
-		if ( m_pDevice->IsMonitoring() )
 		{
-			AkAutoLock<CAkIOThread> lock( *m_pDevice );
-			m_pDevice->PushTransferStatistics( uTransferSize );
+			m_uBytesTransfered += uTransferSize;
+
+			bool bIsFromLowLevel = in_pMemView->Status() != CAkStmMemView::TransferStatus_Ready;
+			if (bIsFromLowLevel)
+				m_uBytesTransferedLowLevel += uTransferSize;	// Was not already ready: required low-level transfer.
+
+			// Push transfer statistics only if monitoring, as this requires unwanted locking.
+			if (m_pDevice->IsMonitoring())
+				m_pDevice->PushTransferStatistics(uTransferSize, bIsFromLowLevel);
 		}
 #endif
 
@@ -2307,8 +2627,6 @@ void CAkAutoStmBase::AddMemView(
 		AkAutoLock<CAkIOThread> lock( *m_pDevice );
 
 		DestroyBuffer( in_pMemView );
-
-        m_pDevice->NotifyMemChange();
     }
 }
 
@@ -2316,7 +2634,7 @@ void CAkAutoStmBase::AddMemView(
 void CAkAutoStmBase::UpdateTaskStatus(
 	AKRESULT	in_eIOResult			// AK_Success if IO was successful, AK_Cancelled if IO was cancelled, AK_Fail otherwise.
 	)
-{    
+{
     // Status.
     if ( AK_Fail == in_eIOResult )
     {
@@ -2363,27 +2681,49 @@ void CAkAutoStmBase::GetStreamData(
     AkStreamData & out_streamData
     )
 {
+	AkAutoLock<CAkLock> stmBufferGate(m_lockStatus);
+
     out_streamData.uStreamID = m_uStreamID;
     out_streamData.uPriority = m_priority;
 	out_streamData.uFilePosition = m_uNextExpectedUserPosition;
 	out_streamData.uVirtualBufferingSize = m_uVirtualBufferingSize;
 	// IMPORTANT: Target buffering size logic should be kept in sync with NeedsBuffering.
 	out_streamData.uTargetBufferingSize = static_cast<AkUInt32>( m_pDevice->GetTargetAutoStmBufferLength() * m_fThroughput );
-	// Clamp buffering size to target.
-	if ( out_streamData.uVirtualBufferingSize > out_streamData.uTargetBufferingSize )
-		out_streamData.uVirtualBufferingSize = out_streamData.uTargetBufferingSize;	// Clamp amount of available data to target buffer length.
-	out_streamData.uMemoryReferenced = m_listBuffers.Length() * m_pDevice->GetGranularity();
+	
 	out_streamData.fEstimatedThroughput = m_fThroughput;
 	out_streamData.uNumBytesTransfered = m_uBytesTransfered;
 	out_streamData.uNumBytesTransferedLowLevel = m_uBytesTransferedLowLevel;
 	out_streamData.bActive = m_bWasActive;
+
+	out_streamData.uMemoryReferenced = 0;
+	out_streamData.uBufferedSize = 0;
+	{
+		AkUInt32 uNextToGrant = m_uNextToGrant;
+
+		// Add up memory
+		for (AkBufferList::Iterator it = m_listBuffers.Begin(); it != m_listBuffers.End(); ++it)
+		{
+			out_streamData.uMemoryReferenced += (*it)->AllocSize();
+
+			if (uNextToGrant == 0)
+				out_streamData.uBufferedSize += GetEffectiveViewSize(*it);
+			else
+				uNextToGrant--;
+		}
+
+		if ( m_bCanClearActiveProfile )
+			m_bWasActive = false;
+	}
+
+	// Clamp buffering size to target.
+	if (out_streamData.uVirtualBufferingSize > out_streamData.uTargetBufferingSize)
+		out_streamData.uVirtualBufferingSize = out_streamData.uTargetBufferingSize;	// Clamp amount of available data to target buffer length.
+
+	if (out_streamData.uBufferedSize > out_streamData.uTargetBufferingSize)
+		out_streamData.uBufferedSize = out_streamData.uTargetBufferingSize;	// Clamp amount of available data to target buffer length.
+
 	m_uBytesTransfered = 0;    // Reset.
 	m_uBytesTransferedLowLevel = 0;
-	if ( m_bCanClearActiveProfile )
-	{
-		AkAutoLock<CAkLock> stmBufferGate( m_lockStatus );
-		m_bWasActive = false;
-	}
 }
 
 // Signals that stream can be destroyed.
@@ -2391,6 +2731,7 @@ void CAkAutoStmBase::ProfileAllowDestruction()
 {
     AKASSERT( m_bIsToBeDestroyed );
     m_bIsProfileDestructionAllowed = true;
+	AkAutoLock<CAkLock> statusChange( m_lockStatus );
 	UpdateSchedulingStatus();
 }
 #endif
@@ -2481,7 +2822,7 @@ bool CAkAutoStmBase::NeedsBuffering(
 	)
 {
 	// Needs buffering if below target buffer length.
-	return ( in_uVirtualBufferingSize < m_pDevice->GetTargetAutoStmBufferLength() * m_fThroughput );
+	return ( in_uVirtualBufferingSize < (AkUInt32)(m_pDevice->GetTargetAutoStmBufferLength() * m_fThroughput) );
 }
 
 // Returns a buffer filled with data. NULL if no data is ready.
@@ -2555,7 +2896,6 @@ void CAkAutoStmBase::Flush()
 			it = m_listBuffers.Erase( it );
 			DestroyBuffer( pMemView );
         }
-        m_pDevice->NotifyMemChange();
     }
 
 	UpdateSchedulingStatus();

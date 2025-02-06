@@ -153,6 +153,7 @@ AKRESULT CAkIOThread::Init(
     // Launch the scheduler/IO thread.
     // Create and start the worker IO thread with default stack size.
 	
+	m_threadProperties = in_threadProperties;
 	m_bDoRun = true;
 	AKPLATFORM::AkCreateThread(
 		CAkIOThread::IOSchedThread,			// Start address
@@ -200,8 +201,9 @@ void CAkIOThread::Term()
 // Scheduler thread.
 // --------------------------------------------------------
 AK_DECLARE_THREAD_ROUTINE( CAkIOThread::IOSchedThread )
-{
+{	
     CAkIOThread * pDevice = AK_GET_THREAD_ROUTINE_PARAMETER_PTR( CAkIOThread );
+	AK_THREAD_INIT_CODE(pDevice->m_threadProperties);
 
 	struct timespec   ts;
 	struct timeval    tp;

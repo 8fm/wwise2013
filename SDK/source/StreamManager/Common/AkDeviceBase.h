@@ -11,6 +11,7 @@
 #define _AK_DEVICE_BASE_H_
 
 #include "AkIOThread.h"
+#include <AK/Tools/Common/AkAutoLock.h>
 #include <AK/Tools/Common/AkLock.h>
 #include <AK/Tools/Common/AkArray.h>
 #include "AkStreamMgr.h"
@@ -83,18 +84,30 @@ namespace StreamMgr
         AkDeviceID		GetDeviceID();
 
 		// Stream objects creation.
-        virtual CAkStmTask *	CreateStd(
+        CAkStmTask *	CreateStd(
             AkFileDesc *				in_pFileDesc,		// Low-level IO file descriptor.
             AkOpenMode                  in_eOpenMode,       // Open mode (read, write, ...).
             IAkStdStream *&             out_pStream         // Returned interface to a standard stream.
-            ) = 0;
-        virtual CAkStmTask *	CreateAuto(
+            );
+        CAkStmTask *	CreateAuto(
             AkFileDesc *				in_pFileDesc,		// Low-level IO file descriptor.
 			AkFileID					in_fileID,			// Application defined ID. Pass AK_INVALID_FILE_ID if unknown.
             const AkAutoStmHeuristics & in_heuristics,      // Streaming heuristics.
             AkAutoStmBufSettings *      in_pBufferSettings, // Stream buffer settings. Pass NULL to use defaults (recommended).
             IAkAutoStream *&            out_pStream         // Returned interface to an automatic stream.
-            ) = 0;
+            );
+
+		virtual CAkStmTask *	CreateCachingStream(
+			AkFileDesc *				in_pFileDesc,			// Low-level IO file descriptor.
+			AkFileID					in_fileID,				// Application defined ID. Pass AK_INVALID_FILE_ID if unknown.
+			AkUInt32					in_uNumBytesPrefetch,	// Number of bytes to cache
+			AkPriority					in_uPriority,			// Caching stream priority
+			IAkAutoStream *&            out_pStream			// Returned interface to an automatic stream.
+			);
+
+		// Update the priority of a caching stream.  This function takes care of making sure the appropriate caching streams are started 
+		//	again if necessary, if we are at or near the caching memory limit.
+		void UpdateCachingPriority(CAkAutoStmBase * in_pStream, AkPriority in_uNewPriority);
 
 		// Force the device to clean up dead tasks. 
 		void			ForceCleanup(
@@ -135,17 +148,27 @@ namespace StreamMgr
 		// Memory views factory.
 
 	protected:
+
+		typedef AkListBareLight<CAkStmTask> TaskList;
+
+		// Pure virtual interface for creating stream objects.
+		virtual CAkStmTask *	_CreateStd(
+			AkFileDesc *				in_pFileDesc,		// Low-level IO file descriptor.
+			AkOpenMode                  in_eOpenMode,       // Open mode (read, write, ...).
+			IAkStdStream *&             out_pStream         // Returned interface to a standard stream.
+			) = 0;
+
+		virtual CAkStmTask *	_CreateAuto(
+			AkFileDesc *				in_pFileDesc,		// Low-level IO file descriptor.
+			AkFileID					in_fileID,			// Application defined ID. Pass AK_INVALID_FILE_ID if unknown.
+			const AkAutoStmHeuristics & in_heuristics,      // Streaming heuristics.
+			AkAutoStmBufSettings *      in_pBufferSettings, // Stream buffer settings. Pass NULL to use defaults (recommended).
+			IAkAutoStream *&            out_pStream         // Returned interface to an automatic stream.
+			) = 0;
+
 		// Create a new, empty streaming memory view.
-		// Note: Mem view objects are cached and allocated at init.
 		// Sync: Caller must hold stream lock.
-		inline CAkStmMemView * MemViewFactory()
-		{
-			CAkStmMemView * pMemView = m_poolStmMemView.First();
-			AKASSERT( pMemView || !"Mem views exceed the maximum amount allowed" );
-			m_poolStmMemView.RemoveFirst();
-			AKASSERT( !pMemView->Block() );
-			return pMemView;
-		}
+		virtual CAkStmMemView * MemViewFactory() = 0;
 
 	public:
 
@@ -161,7 +184,7 @@ namespace StreamMgr
 			if ( pBlock )
 				uRefCount = m_mgrMemIO.ReleaseBlock( pBlock );
 			AKASSERT( !in_pMemView->Block() );
-			m_poolStmMemView.AddFirst( in_pMemView );
+			AkDelete( CAkStreamMgr::GetObjPoolID(), in_pMemView );
 			return uRefCount;
 		}
 
@@ -176,13 +199,18 @@ namespace StreamMgr
 			if ( pBlockToRelease )
 				m_mgrMemIO.DestroyTempBlock( in_pMemBlockBase, pBlockToRelease );
 			AKASSERT( !in_pMemView->Block() );
-			m_poolStmMemView.AddFirst( in_pMemView );
+			AkDelete( CAkStreamMgr::GetObjPoolID(), in_pMemView );
 		}
 
 		// Try execute next transfer from cache data. 
 		// Returns false if it requires a low-level transfer, or if this is not supported by the device.
-		virtual bool ExecuteCachedTransfer( CAkStmTask * ) { return false; }
+		virtual bool ExecuteCachedTransfer( CAkStmTask * );
         
+		AkUInt32 RemainingCachePinnedBytes() const
+		{
+			return m_uMaxCachePinnedBytes - m_uCurrentCachePinnedData;	
+		}
+
         // Device Profile Ex interface.
         // --------------------------------------------------------
 #ifndef AK_OPTIMIZED
@@ -211,24 +239,48 @@ namespace StreamMgr
             AkUInt32    in_uStreamIndex             // [0,numStreams[
             );
 
-		inline void PushTransferStatistics( AkUInt32 in_uSizeTransferred )
+		inline void PushTransferStatistics( AkUInt32 in_uSizeTransferred, bool in_bFromLowLevel )
 		{
-			m_uTotalBytesTransferred += in_uSizeTransferred;
+			AkAutoLock<CAkIOThread> lock(*this);
+
+			m_uBytesThisInterval += in_uSizeTransferred;
+			m_uBytesThisSession += in_uSizeTransferred;
+
+			if (in_bFromLowLevel)
+			{
+				m_uNumLowLevelRequests++;
+				m_uBytesLowLevelThisInterval += in_uSizeTransferred;
+				m_uBytesThisSession += in_uSizeTransferred;
+			}
+
+			AKASSERT(m_uBytesThisInterval >= m_uBytesLowLevelThisInterval);
 		}
 
 #endif
 
     protected:
 
+		void CountStreamsInTaskList(TaskList& in_listTasks);
+
         // Add a new task to the list.
         void AddTask( 
-            CAkStmTask * in_pStmTask
+            CAkStmTask * in_pStmTask,
+			TaskList& in_listToAddTo
             );
 
         // Destroys all streams.
 		// Returns true if it was able to destroy all streams. Otherwise, the IO thread needs to
 		// wait for pending transfers to complete.
         virtual bool ClearStreams();
+
+		bool ClearTaskList(TaskList& in_taskList);
+
+		//Return true if a task was killed
+		bool ForceTaskListCleanup(
+			bool in_bKillLowestPriorityTask,				// True if the device should kill the task with lowest priority.
+			AkPriority in_priority,							// Priority of the new task if applicable. Pass AK_MAX_PRIORITY to ignore.
+			TaskList& in_listTasks
+			);
 
 		// Called once when I/O thread starts.
 		virtual void OnThreadStart();
@@ -241,13 +293,18 @@ namespace StreamMgr
         CAkStmTask *    SchedulerFindNextTask(
 			AkReal32 &		out_fOpDeadline	// Returned deadline for this transfer.
             );
+
+		CAkStmTask *    SchedulerFindNextCachingTask();
+
         // Finds next task among standard streams only (typically when there is no more memory for automatic streams).
         CAkStmTask *    ScheduleStdStmOnly(
 			AkReal32 &	out_fOpDeadline		// Returned deadline for this transfer.
             );
 
 	protected:
-		AK_DEFINE_ARRAY_POOL( ArrayPoolLocal, CAkStreamMgr::GetObjPoolID() )
+		AK_DEFINE_ARRAY_POOL( _ArrayPoolLocal, CAkStreamMgr::GetObjPoolID() )
+		typedef AkArrayAllocatorNoAlign<_ArrayPoolLocal> ArrayPoolLocal;
+		CAkStmTask * SchedulerFindLowestPriorityCachingTask(AkPriority in_uMaxPriority);
 
 		// Time in milliseconds. Stamped at every scheduler pass.
         AkInt64         m_time;
@@ -256,8 +313,9 @@ namespace StreamMgr
         // Tasks live in m_arTasks from the time they are created until they are completely destroyed (by the I/O thread).
         // It is more efficient to query the tasks every time scheduling occurs than to add/remove them from the list, 
         // every time, from other threads.
-        typedef AkListBareLight<CAkStmTask> TaskList;
+        
         TaskList		m_listTasks;            // List of tasks.
+		TaskList		m_listCachingTasks;    // List of caching tasks.
         CAkLock         m_lockTasksList;        // Protects tasks array.
 
 		// Stream IO memory.
@@ -275,20 +333,27 @@ namespace StreamMgr
 
         AkDeviceID      m_deviceID;
 
-		// Streaming memory view pool.
-		AkStmMemViewListLight	m_poolStmMemView;
-		CAkStmMemView *			m_pStmMemViewMem;
+		AkUInt32 m_uMaxCachePinnedBytes;
+		AkUInt32 m_uCurrentCachePinnedData;
 
         // Profiling specifics.
 #ifndef AK_OPTIMIZED
+
+		//Per profile interval data:
 		AkInt32			m_uNumActiveStreams;	// Number of automatic streams that are running, plus number of standard streams that have an operation pending.
-		AkUInt32		m_uNumBytesTransferredFromLowLevel;	// Bandwidth of real transfers.
-		AkUInt32		m_uTotalBytesTransferred;	// Total bandwidth, including the amount of data newly referenced from cache.
+		AkUInt32		m_uBytesLowLevelThisInterval;	// Bandwidth of real transfers.
+		AkUInt32		m_uBytesThisInterval;	// Bandwidth, including the amount of data newly referenced from cache.
 		AkUInt32		m_uNumLowLevelRequests;	// Number of requests to the low-level IO since lass profiling pass.
 		AkUInt32		m_uNumLowLevelRequestsCancelled;	// Number of requests to the low-level IO that were cancelled since lass profiling pass.
-        bool            m_bIsMonitoring;
-        bool            m_bIsNew;
-	
+        
+		//Per profiling session data:
+		AkUInt64		m_uBytesThisSession;	// Data, including the data grabbed from cache, over the life of the profiling session.
+		AkUInt64		m_uCacheBytesThisSession;	// Data grabbed from cache, over the life of the profiling session.
+
+		//Flags
+		bool            m_bIsMonitoring;
+		bool            m_bIsNew;
+
 	protected:
 		typedef AkArray<AK::IAkStreamProfile*,AK::IAkStreamProfile*,ArrayPoolLocal,AK_STM_OBJ_POOL_BLOCK_SIZE/sizeof(CAkStmTask*)> ArrayStreamProfiles;
         ArrayStreamProfiles m_arStreamProfiles; // Tasks pointers are copied there when GetNumStreams() is called, to avoid 
@@ -406,12 +471,14 @@ namespace StreamMgr
 		virtual CAkStmMemView * PrepareTransfer( 
 			AkFileDesc *&			out_pFileDesc,		// Stream's associated file descriptor.
 			CAkLowLevelTransfer *&	out_pLowLevelXfer,	// Low-level transfer. Set to NULL if it doesn't need to be pushed to the Low-Level IO.
+			bool &					out_bExistingLowLevelXfer, // Indicates a low level transfer already exists that references the memory block returned.
 			bool					in_bCacheOnly		// Prepare transfer only if data is found in cache. out_pLowLevelXfer will be NULL.
 			) = 0;
 
         // Update stream object after I/O.
 		// Sync: Locks stream's status.
-		virtual void Update(
+		// Return true if a pending buffer was added to the buffer list
+		virtual bool Update(
 			CAkStmMemView *	in_pTransfer,	// Logical transfer object.
 			AKRESULT		in_eIOResult,	// AK_Success if IO was successful, AK_Cancelled if IO was cancelled, AK_Fail otherwise.
 			bool			in_bRequiredLowLevelXfer	// True if this transfer required a call to low-level.
@@ -506,6 +573,15 @@ namespace StreamMgr
 			return m_bWasActive;
 		}
 #endif
+		inline bool IsCachingStream()
+		{
+			return m_bIsCachingStream;
+		}
+
+		inline void SetIsCachingStream()
+		{
+			m_bIsCachingStream = true;
+		}
 
 		// List bare light sibling: device's TaskList.
 		CAkStmTask * pNextLightItem;
@@ -516,8 +592,22 @@ namespace StreamMgr
 			SetReadyForIO( false );
 		}
 
+		//
+		//	Caching stream interface
+		//
+
+		virtual void SetCachingBufferSize(AkUInt32 /*in_uNumBytes*/ ) {}
+
+		virtual AkUInt32 GetNominalBuffering()			{return 0;}
+		virtual AkUInt32 GetVirtualBufferingSize()		{return 0;}
+
+		virtual void StartCaching(){}
+
+		virtual AkUInt32 StopCaching(AkUInt32 /*in_uMemNeeded*/){ return 0; }
+		
 	protected:
 
+		virtual AkUInt32 ReleaseCachingBuffers(AkUInt32 /*in_uMemNeeded*/){ return 0; }
 		// Helpers.
 
 		// Set "Ready for I/O" status.
@@ -529,18 +619,32 @@ namespace StreamMgr
 		// Returns size clamped to end of file.
 		inline AkUInt32 ClampRequestSizeToEof( AkUInt64 in_uPosition, AkUInt32 in_uDesiredSize, bool & out_bEof )
 		{
+			AkUInt32 uClampedSize = in_uDesiredSize;
+
 			AkUInt64 uPositionOfEof = FileSize();
 			if ( ( in_uPosition + in_uDesiredSize ) <= uPositionOfEof )
 			{
 				out_bEof = false;
-				return in_uDesiredSize;
 			}
-			
-			out_bEof = true;
-			if ( in_uPosition < uPositionOfEof )
-				return (AkUInt32)( uPositionOfEof - in_uPosition );	// Truncated at EOF.
 			else
-				return 0;
+			{
+				out_bEof = true;
+
+				if ( in_uPosition < uPositionOfEof )
+					uClampedSize = (AkUInt32)( uPositionOfEof - in_uPosition );	// Truncated at EOF.
+				else
+					uClampedSize = 0;
+			}
+
+			//Check for caching streams
+			if ( m_bIsCachingStream )
+			{
+				AkUInt32 uNominalBuffering = GetNominalBuffering();
+				if(  in_uPosition + uClampedSize > uNominalBuffering )
+					uClampedSize = uNominalBuffering - (AkUInt32) in_uPosition;
+			}
+
+			return uClampedSize;
 		}
 
 		void FreeDeferredOpenData();
@@ -581,6 +685,7 @@ namespace StreamMgr
         AkUInt8				m_bIsToBeDestroyed  :1; // True when this stream is scheduled to be destroyed.
         AkUInt8				m_bIsFileOpen	:1;	// False while Low-Level IO open is pending.
 		AkUInt8				m_bRequiresScheduling	:1; // Stream's own indicator saying if it counts in the scheduler semaphore.
+		AkUInt8				m_bIsCachingStream :1;	//Stream is used for locking data into the cache.	
 	private:
 		AkUInt8				m_bIsReadyForIO	:1;	// True when task is in a state where it is ready for an I/O transfer (distinct from Deadline-based status).
 	
@@ -862,6 +967,18 @@ namespace StreamMgr
 			AkUInt32 & out_uNumBytesAvailable 
 			);
 
+		//Return the amount of data in all the attached buffers for this stream
+		virtual AkUInt32 GetVirtualBufferingSize();
+
+		// Set the amount of data that you want to cache in a caching stream.
+		virtual void SetCachingBufferSize(AkUInt32 in_uNumBytes);
+
+		virtual void StartCaching();
+
+		//Stop Caching and release the buffers that are being held in a caching stream, up to in_uMemNeeded bytes. 
+		//Return the amount of data that is freed.
+		virtual AkUInt32 StopCaching(AkUInt32 in_uMemNeeded);
+
 		// Returns the target buffering size based on the throughput heuristic.
 		virtual AkUInt32 GetNominalBuffering();
 
@@ -929,6 +1046,13 @@ namespace StreamMgr
 		//-----------------------------------------------------------------------------
         // Helpers.
         //-----------------------------------------------------------------------------
+
+		// Add up the amount of data that is ready to be consumed but has not been granted yet.
+		AKRESULT CalcUnconsumedBufferSize(AkUInt32 & out_uNumBytesAvailable);
+
+		//Release the buffers that are being held in a caching stream, up to in_uMemNeeded bytes. 
+		//Return the amount of data that is freed.
+		virtual AkUInt32 ReleaseCachingBuffers(AkUInt32 in_uMemNeeded);
 
 		bool NeedsBuffering(
 			AkUInt32 in_uVirtualBufferingSize
@@ -1113,6 +1237,7 @@ namespace StreamMgr
         // Stream status.
         AkUInt8            	m_bIsRunning    :1; // Running or paused.
         AkUInt8           	m_bIOError      :1; // Stream encountered I/O error.
+		AkUInt8				m_bCachingReady	:1; // Caching stream is fully constructed and started.
     };
 }
 }

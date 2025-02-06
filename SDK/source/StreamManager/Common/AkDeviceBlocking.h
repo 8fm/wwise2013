@@ -62,26 +62,6 @@ namespace StreamMgr
             AkDeviceID					in_deviceID 
             );
 
-		// Stream creation interface.
-        // --------------------------------------------------------
-
-        // Standard stream.
-        virtual CAkStmTask * CreateStd(
-            AkFileDesc *				in_pFileDesc,		// Low-level IO file descriptor.
-            AkOpenMode					in_eOpenMode,       // Open mode (read, write, ...).
-			IAkStdStream *&				out_pStream         // Returned interface to a standard stream.
-            );
-        
-        // Automatic stream
-        virtual CAkStmTask * CreateAuto(
-            AkFileDesc *				in_pFileDesc,		// Low-level IO file descriptor.
-			AkFileID					in_fileID,			// Application defined ID. Pass AK_INVALID_FILE_ID if unknown.
-            const AkAutoStmHeuristics & in_heuristics,      // Streaming heuristics.
-            AkAutoStmBufSettings *      in_pBufferSettings, // Stream buffer settings. Pass NULL to use defaults (recommended).
-			IAkAutoStream *&            out_pStream         // Returned interface to an automatic stream.
-            );
-
-
 		// IO memory access.
 		// -----------------------------------------------------
 
@@ -129,12 +109,32 @@ namespace StreamMgr
 
     protected:
 
+		// Stream creation interface.
+		// --------------------------------------------------------
+
+		// Standard stream.
+		virtual CAkStmTask * _CreateStd(
+			AkFileDesc *				in_pFileDesc,		// Low-level IO file descriptor.
+			AkOpenMode					in_eOpenMode,       // Open mode (read, write, ...).
+			IAkStdStream *&				out_pStream         // Returned interface to a standard stream.
+			);
+
+		// Automatic stream
+		virtual CAkStmTask * _CreateAuto(
+			AkFileDesc *				in_pFileDesc,		// Low-level IO file descriptor.
+			AkFileID					in_fileID,			// Application defined ID. Pass AK_INVALID_FILE_ID if unknown.
+			const AkAutoStmHeuristics & in_heuristics,      // Streaming heuristics.
+			AkAutoStmBufSettings *      in_pBufferSettings, // Stream buffer settings. Pass NULL to use defaults (recommended).
+			IAkAutoStream *&            out_pStream         // Returned interface to an automatic stream.
+			);
+
+		virtual CAkStmMemView * MemViewFactory()
+		{
+			return AkNew( CAkStreamMgr::GetObjPoolID(), CAkStmMemView(true) );
+		}
+
         // This device's implementation of PerformIO().
         virtual void PerformIO();
-
-		// Try execute next transfer from cache data. 
-		// Returns false if it requires a low-level transfer, or if this is not supported by the device.
-		virtual bool ExecuteCachedTransfer( CAkStmTask * in_pTask );
 
         // Execute task chosen by scheduler.
         void ExecuteTask( 
@@ -184,20 +184,7 @@ namespace StreamMgr
 			AKASSERT( pMemBlock->pTransfer );
 			// Clear block's low-level transfer.
 			pMemBlock->pTransfer = NULL;
-			if ( in_eResult == AK_Success )
-			{
-#ifndef AK_OPTIMIZED
-				if ( in_bAddToStats )
-				{
-					// Add to stats.
-					// Note: Transfer may have been cancelled for this stream, and in_pOwnerView->Size() would 
-					// equal 0. However, we do not untag the block and assume that its data is valid. 
-					m_uNumLowLevelRequests++;
-					m_uNumBytesTransferredFromLowLevel += pMemBlock->uAvailableSize;
-				}
-#endif
-			}
-			else
+			if ( in_eResult != AK_Success )
 			{
 				// Failed. Block metadata needs to be invalidated.
 				// Avoid calling the memory manager if the file ID was not even set. 
@@ -249,12 +236,13 @@ namespace StreamMgr
         virtual CAkStmMemView * PrepareTransfer( 
 			AkFileDesc *&			out_pFileDesc,		// Stream's associated file descriptor.
 			CAkLowLevelTransfer *&	out_pLowLevelXfer,	// Low-level transfer. Set to NULL if it doesn't need to be pushed to the Low-Level IO.
+			bool &					out_bExistingLowLevelXfer, // Always false on the blocking device.
 			bool					in_bCacheOnly		// Prepare transfer only if data is found in cache. out_pLowLevelXfer will be NULL.
 			);
 
 		// Update stream object after I/O.
 		// Sync: Locks stream's status.
-		virtual void Update(
+		virtual bool Update(
 			CAkStmMemView *	in_pTransfer,	// Logical transfer object.
 			AKRESULT		in_eIOResult,	// AK_Success if IO was successful, AK_Cancelled if IO was cancelled, AK_Fail otherwise.
 			bool			in_bRequiredLowLevelXfer	// True if this transfer required a call to low-level.
@@ -299,12 +287,13 @@ namespace StreamMgr
         virtual CAkStmMemView * PrepareTransfer( 
 			AkFileDesc *&			out_pFileDesc,		// Stream's associated file descriptor.
 			CAkLowLevelTransfer *&	out_pLowLevelXfer,	// Low-level transfer. Set to NULL if it doesn't need to be pushed to the Low-Level IO.
+			bool &					out_bExistingLowLevelXfer, // Always false for std streams.
 			bool					in_bCacheOnly		// Prepare transfer only if data is found in cache. out_pLowLevelXfer will be NULL.
 			);
 
 		// Update stream object after I/O.
 		// Sync: Locks stream's status.
-		virtual void Update(
+		virtual bool Update(
 			CAkStmMemView *	in_pTransfer,	// Logical transfer object.
 			AKRESULT		in_eIOResult,	// AK_Success if IO was successful, AK_Cancelled if IO was cancelled, AK_Fail otherwise.
 			bool			in_bRequiredLowLevelXfer	// True if this transfer required a call to low-level.
@@ -318,6 +307,10 @@ namespace StreamMgr
 		
 		// Cancel all pending transfers.
 		virtual void CancelAllPendingTransfers();
+
+		// For use with caching streams.  Try to recover up to in_uTargetMemToRecover bytes by freeing data starting
+		//	with the most recent pending transfer and working backwards to the beginning of the file.
+		virtual AkUInt32 ReleaseCachingBuffers(AkUInt32 in_uTargetMemToRecover);
 
 		// Cancel all pending transfers that are inconsistent with the next expected position (argument) 
 		// and looping heuristics.

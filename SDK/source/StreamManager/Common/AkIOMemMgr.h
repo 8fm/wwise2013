@@ -15,16 +15,17 @@
 #include <AK/Tools/Common/AkListBareLight.h>
 #include <AK/Tools/Common/AkArray.h>
 #include <AK/SoundEngine/Common/AkStreamMgrModule.h>
+#include "AkBuddyBlockPool.h"
 
 // ------------------------------------------------------------------------------
 // Defines.
 // ------------------------------------------------------------------------------
 
-
 namespace AK
 {
 namespace StreamMgr
 {
+	class CAkIOThread;
 	// ------------------------------------------------------------------------------
     // Low level transfer base.
 	// Abstract object used for transfers to the low-level IO. Defined here because it 
@@ -46,6 +47,7 @@ namespace StreamMgr
 			, pData( in_pMemAddress )
 			, pTransfer( NULL )
 			, uAvailableSize( 0 )
+			, uAllocSize( 0 )
 			, fileID( AK_INVALID_FILE_ID )
 			, uRefCount( 0 )			
 		{}
@@ -65,12 +67,14 @@ namespace StreamMgr
 			CAkLowLevelTransfer *	pTransfer;	// Low-level transfer on its way to refill this block. When the block is idle, pTransfer is NULL.
 		};
 		AkUInt32		uAvailableSize;	// Number of bytes of valid data in this memory block.
+		AkUInt32		uAllocSize;		// Buffer allocation size
 		AkFileID		fileID;			// File ID. If the block is not tagged (and therefore cannot be shared), it is AK_INVALID_FILE_ID.
 		AkUInt16		uRefCount;		// Block's ref count.
 	};
+	template <class T>
 	struct AkListBareNextMemBlock
 	{
-		static AkForceInline AkMemBlock *& Get( AkMemBlock * in_pItem ) 
+		static AkForceInline T *& Get( T * in_pItem ) 
 		{
 			return in_pItem->pNextBlock;
 		}
@@ -82,8 +86,9 @@ namespace StreamMgr
 	// Array extended with an optimized Move() function, useful when changing memory 
 	// blocks information.
 	// ------------------------------------------------------------------------------
-	AK_DEFINE_ARRAY_POOL( ArrayPoolLocal, CAkStreamMgr::GetObjPoolID() )
-	typedef AkArray<AkUInt16,AkUInt16, ArrayPoolLocal, 0> AkArrayBlocks;
+	AK_DEFINE_ARRAY_POOL( _ArrayPoolLocal, CAkStreamMgr::GetObjPoolID() )
+	typedef AkArrayAllocatorNoAlign<_ArrayPoolLocal> ArrayPoolLocal;
+	typedef AkArray<AkMemBlock*,AkMemBlock*, ArrayPoolLocal> AkArrayBlocks;
 	class AkMemBlocksDictionnary : public AkArrayBlocks
 	{
 	public:
@@ -93,7 +98,7 @@ namespace StreamMgr
 		void Move( unsigned int in_uIndexSource, unsigned int in_uIndexDestination )
 		{
 			AKASSERT( in_uIndexSource < Length() );
-			AkUInt16 sourceItem = m_pItems[in_uIndexSource];
+			AkMemBlock* sourceItem = m_pItems[in_uIndexSource];
 			if ( in_uIndexSource >= in_uIndexDestination )
 			{
 				AKASSERT( in_uIndexDestination < Length() );
@@ -123,7 +128,8 @@ namespace StreamMgr
 		CAkIOMemMgr();
 		virtual ~CAkIOMemMgr();
 
-		AKRESULT Init( const AkDeviceSettings &	in_settings );
+		AKRESULT Init( const AkDeviceSettings &	in_settings,
+			CAkIOThread* in_pIoThread );
 		void Term();
 
 		// IO memory access.
@@ -139,6 +145,8 @@ namespace StreamMgr
 		// Get a free memory block.
 		// Removes it from the list and returns an addref'd memory block if available. NULL if none found.
 		void GetOldestFreeBlock(
+			AkUInt32 in_uRequestedBufferSize,
+			AkUInt32 in_uBlockAlignment,
 			AkMemBlock *&	out_pMemBlock		// Returned memory block is addref'd (to 1), NULL if none found.
 			);
 
@@ -162,7 +170,7 @@ namespace StreamMgr
 			);
 		
 		// Tag a block with caching info BEFORE IO transfer.
-		void TagBlock(
+		AKRESULT TagBlock(
 			AkMemBlock *	in_pMemBlock,		// Memory block to tag with cache info.
 			CAkLowLevelTransfer * in_pTransfer,	// Associated transfer.
 			AkFileID		in_fileID,			// File ID.
@@ -174,7 +182,7 @@ namespace StreamMgr
 			AkMemBlock *	in_pMemBlock		// Memory block to tag with caching info.
 			);
 		// Untag all blocks (cache flush).
-		void UntagAllBlocks();
+		void FlushCache();
 
 		// Temporary blocks. 
 		// Clone a memory block in order to have simultaneous low-level transfers on the 
@@ -191,9 +199,8 @@ namespace StreamMgr
 		
 		// Getters.
 		//
-		inline bool HasPool() { return ( m_streamIOPoolId != AK_INVALID_POOL_ID ); }
+		inline bool HasPool() { return (m_StreamPool.IsInitialized()); }
 		inline bool UseCache() { return m_bUseCache; }
-		inline AkUInt32 NumViewsAvailable() { return m_uNumViewsAvail; }
 
 		// Profiling.
 		//
@@ -204,8 +211,7 @@ namespace StreamMgr
 
 	private:
 
-		inline AkMemBlock * IndexToMemBlock( AkUInt16 in_uIndex ) { return m_pMemBlocks + in_uIndex; }
-		inline AkUInt16 MemBlockToIndex( AkMemBlock * in_pMemBlock ) { return (AkUInt16)(((AkUIntPtr)(in_pMemBlock) - (AkUIntPtr)(m_pMemBlocks)) / sizeof(AkMemBlock)); }
+		void UpdatePeakMemUsed();
 
 #ifdef _DEBUG
 		void CheckCacheConsistency( AkMemBlock * in_pMustFindBlock = NULL );
@@ -223,11 +229,16 @@ namespace StreamMgr
 
 
 	private:
+
+		void FreeMemBlock( AkMemBlock* in_pBlk );
+		AkMemBlock* AllocMemBlock( AkUInt32 in_uAllocSize, AkUInt32 in_uBufferSize, AkUInt32 in_uBlockAlignment );
+		
 		// Collection of memory blocks.
 		typedef AkListBare<AkMemBlock, AkListBareNextMemBlock,AkCountPolicyWithCount>	AkMemBlockList;
-		void *				m_pIOMemory;		// IO memory.
-		AkMemBlock * 		m_pMemBlocks;		// Address of first memory block structure.
-		AkMemBlockList		m_listFreeBuffers;	// Free blocks (ref count = 0). This is a linked list for MRU: always get the buffer that has been free for the longest time.
+		
+		AkMemBlockList		m_listCachedBuffers;	// Free blocks (ref count = 0). This is a linked list for MRU: always get the buffer that has been free for the longest time.
+		AkUInt32			m_totalCachedMem;		// Sum of the sizes of m_listCachedBuffers. 
+		AkUInt32			m_totalAllocedMem;
 
 		// Dictionnary of cached data.
 		// The memory manager keeps blocks sorted in order to perform binary searching.
@@ -237,16 +248,13 @@ namespace StreamMgr
 		// 3) Address of data (increasing)
 		// Only keys 1 and 2 are used in order to find a suitable cached block. 
 		// All 3 keys are used in order to find a unique block (for tagging).
-		AkMemBlocksDictionnary	m_arMemBlocks;		// Repository of all memory blocks: accessed for caching.
+		AkMemBlocksDictionnary	m_arTaggedBlocks;		// Repository of all memory blocks: accessed for caching.
 
 		// Global settings.
-		AkMemPoolId			m_streamIOPoolId;	// IO memory.
-		AkUInt32			m_uNumViewsAvail;	// Number of views to memory blocks available. The initial value is deduced from 
-												// AkDeviceSettings::fMaxCacheRatio.
-												// When the number of views available is equal to the number of free buffers,
-												// no more caching occurs. 
-												// Devices should query the initial value in order to compute mem view structures preallocation.
-		bool				m_bUseCache;		// True if AkDeviceSettings::fMaxCacheRatio is greater than 1.f
+		AkBuddyBlockPool	m_StreamPool;
+		bool				m_bUseCache;		// True if AkDeviceSettings::bUseStreamCache is true
+
+		CAkIOThread* 		m_pIoThread;
 
 		// Profiling.
 #ifndef AK_OPTIMIZED

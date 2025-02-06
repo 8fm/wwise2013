@@ -58,9 +58,10 @@ namespace StreamMgr
 	};
 
 	// List bare light policy for observers list.
+	template <class T>
 	struct AkListBareNextObserver
 	{
-		static AkForceInline CAkStmMemViewDeferred *& Get( CAkStmMemViewDeferred * in_pItem ) 
+		static AkForceInline T *& Get( T * in_pItem ) 
 		{
 			return in_pItem->pNextObserver;
 		}
@@ -91,7 +92,7 @@ namespace StreamMgr
 
 		
 		// Sync: device must be locked when calling this function.		
-		void Prepare( 
+		inline void Prepare( 
 			CAkStmTask * in_pOwner, 
 			void * in_pBuffer,
 			const AkUInt64 in_uPosition,
@@ -113,6 +114,12 @@ namespace StreamMgr
 
 			AKASSERT( m_observers.First() == NULL );
 		}
+
+		// Sync: Device must be locked when calling this function.
+		inline bool IsValid() { return (m_pOwner != NULL); }
+		
+		// Sync: Device must be locked when calling this function.
+		inline void Clear() { m_pOwner = NULL; }
 
 		// Sync: Device must be locked when calling this function.
 		void AddObserver( CAkStmMemViewDeferred * in_pObserver )

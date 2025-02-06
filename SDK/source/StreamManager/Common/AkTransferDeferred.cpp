@@ -39,8 +39,6 @@ void CAkStmMemViewDeferred::Cancel(
 
 	// Lock device in order to safely access low-level transfer, ask it if it is possible to cancel it,
 	// and perform clean up if it is.
-	// However, actual low-level cancellation has to occur within owner task lock, but outside of 
-	// device lock to avoid any deadlock.
 	{
 		AkAutoLock<CAkIOThread> deviceLock( *pDevice );
 
@@ -55,15 +53,10 @@ void CAkStmMemViewDeferred::Cancel(
 			{
 				// Need to proceed with cancellation. Untag mem block while still locked.
 				pDevice->OnLowLevelTransferCancelled( m_pBlock );
+				pLowLevelTransfer->Cancel(in_pLowLevelHook, in_bCallLowLevelIO, in_bAllCancelled);
 			}
-			else
-				pLowLevelTransfer = NULL;	// Set it to NULL to avoid calling Cancel() below.
 		}
 	}
-
-	// The low-level transfer exists and can be cancelled by this task.	
-	if ( pLowLevelTransfer )
-		pLowLevelTransfer->Cancel( in_pLowLevelHook, in_bCallLowLevelIO, in_bAllCancelled );
 }
 
 
@@ -89,7 +82,7 @@ void CAkLowLevelTransferDeferred::LLIOCallback(
 	// Low-level transfer object was stored in pCookie.
 	CAkLowLevelTransferDeferred * pLowLevelTransfer = (CAkLowLevelTransferDeferred*)in_pTransferInfo->pCookie;
 	AKASSERT( pLowLevelTransfer || !"Invalid transfer object: corrupted cookie" );
-
+	AKASSERT(pLowLevelTransfer->IsValid() || !"Calling the callback on an idle transfer!");
 
 	pLowLevelTransfer->Update( in_eResult );
 }

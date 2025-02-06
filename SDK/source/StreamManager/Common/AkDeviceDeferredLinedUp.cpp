@@ -62,31 +62,15 @@ AKRESULT CAkDeviceDeferredLinedUp::Init(
 			m_poolLowLevelTransfers.AddFirst( pXferObj++ );
 		}
 		while ( pXferObj < pXferObjEnd );
-
-		// Preallocate streaming memory views.
-		// The maximum number of views is the memory pool manager's max number of views + maxConcurrentIO (for low-level transfers).
-		AkUInt32 uNumViews = m_mgrMemIO.NumViewsAvailable() + in_settings.uMaxConcurrentIO;
-		m_pStmMemViewMem = (CAkStmMemView*)AkAlloc( CAkStreamMgr::GetObjPoolID(), uNumViews * sizeof( CAkStmMemViewDeferred ) );
-		if ( !m_pStmMemViewMem )
-		{
-			AKASSERT( !"Not enough memory in the stream manager pool to create stream buffer holders." );
-			return AK_Fail;
-		}
-
-		CAkStmMemViewDeferred * pMemView = (CAkStmMemViewDeferred*)m_pStmMemViewMem;
-		CAkStmMemViewDeferred * pMemViewEnd = pMemView + uNumViews;
-		do
-		{
-			AkPlacementNew( pMemView ) CAkStmMemViewDeferred( true ); 
-			m_poolStmMemView.AddFirst( pMemView++ );
-		}
-		while ( pMemView < pMemViewEnd );
 	}
 	return eResult;
 }
 
 void CAkDeviceDeferredLinedUp::Destroy()
 {
+	// Sanity check: if num low-level xfers is 0 then GetNumConcurrentIO() must be 0 - not waiting for unordered request completion.
+	AKASSERT(GetNumConcurrentIO() == 0);
+
 	CAkIOThread::Term();
 
 	if ( m_pLowLevelTransfersMem )
@@ -102,7 +86,7 @@ void CAkDeviceDeferredLinedUp::Destroy()
 // because we need to initialize specialized stream objects.
 // ---------------------------------------------------------------
 // Standard stream.
-CAkStmTask * CAkDeviceDeferredLinedUp::CreateStd(
+CAkStmTask * CAkDeviceDeferredLinedUp::_CreateStd(
     AkFileDesc *				in_pFileDesc,		// Low-level IO file descriptor.
     AkOpenMode					in_eOpenMode,       // Open mode (read, write, ...).
     IAkStdStream *&				out_pStream         // Returned interface to a standard stream.    
@@ -136,7 +120,6 @@ CAkStmTask * CAkDeviceDeferredLinedUp::CreateStd(
 
     if ( AK_Success == eResult )
 	{
-        AddTask( pNewStm );
 		out_pStream = pNewStm;
 		return pNewStm;
 	}
@@ -152,7 +135,7 @@ CAkStmTask * CAkDeviceDeferredLinedUp::CreateStd(
 }
 
 // Automatic stream
-CAkStmTask * CAkDeviceDeferredLinedUp::CreateAuto(
+CAkStmTask * CAkDeviceDeferredLinedUp::_CreateAuto(
     AkFileDesc *				in_pFileDesc,		// Low-level IO file descriptor.
 	AkFileID					in_fileID,			// Application defined ID. Pass AK_INVALID_FILE_ID if unknown.
     const AkAutoStmHeuristics & in_heuristics,      // Streaming heuristics.
@@ -204,7 +187,6 @@ CAkStmTask * CAkDeviceDeferredLinedUp::CreateAuto(
 
 	if ( AK_Success == eResult )
 	{
-		AddTask( pNewStm );
         out_pStream = pNewStm;
 		return pNewStm;
 	}
@@ -242,21 +224,20 @@ void CAkDeviceDeferredLinedUp::ExecuteTask(
 {
 	AKASSERT( in_pTask != NULL );
 
-	IncrementIOCount();
-
 	// Handle deferred opening.
 	AKRESULT eResult = in_pTask->EnsureFileIsOpen();
 	if ( eResult != AK_Success )
 	{
 		// Deferred open failed. Updade/Kill this task and bail out.
-		in_pTask->Update( NULL, AK_Fail, false );
+		in_pTask->Kill();
 		return;
 	}
-    
+
     // Get info for IO.
     AkFileDesc * pFileDesc;
 	CAkLowLevelTransfer * pLowLevelXfer;
-	CAkStmMemView * pMemView = in_pTask->PrepareTransfer( pFileDesc, pLowLevelXfer, false );
+	bool bTransferExistsAlready;
+	CAkStmMemView * pMemView = in_pTask->PrepareTransfer( pFileDesc, pLowLevelXfer, bTransferExistsAlready, false );
 	if ( !pMemView )
 	{
 		// Transfer was cancelled at the last minute (for e.g. the client Destroy()ed the stream.
@@ -267,6 +248,8 @@ void CAkDeviceDeferredLinedUp::ExecuteTask(
 
 	if ( pLowLevelXfer )
 	{
+		AKASSERT( !bTransferExistsAlready );
+
 		// Requires a low-level transfer.
 		AkIoHeuristics heuristics;
 		heuristics.priority = in_pTask->Priority();
@@ -285,9 +268,11 @@ void CAkDeviceDeferredLinedUp::ExecuteTask(
 			CAkLowLevelTransferDeferred::LLIOCallback( &(pLowLevelXferDeferred->info), eResult );
 		}
 	}
-	else
+	else if (!bTransferExistsAlready)
 	{
-		// Update task now if no transfer to the low-level IO was needed.
+		// Update task now if no transfer to the low-level IO was needed, and another transfer does not already exist.
+		//	If we grabbed a block from cache, and a transfer already exists, it means that this memory block is not yet ready.  It will
+		//	be updated in the callback from the LLIO.
 		in_pTask->Update( pMemView, eResult, false );
 	}
 }
@@ -322,44 +307,45 @@ CAkStmMemViewDeferred * CAkDeviceDeferredLinedUp::CreateMemViewStd(
 	// Create a new streaming memory view for this transfer.
 	// If this fails, everything fails.
 	CAkStmMemViewDeferred * pMemView = (CAkStmMemViewDeferred*)MemViewFactory();
-	AKASSERT( pMemView || !"Mem views exceed the maximum amount allowed" );
-	
-	// Instantiate a new temporary memblock if this one is busy.
-	AkMemBlock * pMemBlockForTransfer;
-	if ( in_pMemBlock->IsBusy() )
+	if (pMemView)
 	{
-		m_mgrMemIO.CloneTempBlock( in_pMemBlock, pMemBlockForTransfer );
-		if ( !pMemBlockForTransfer )
+		// Instantiate a new temporary memblock if this one is busy.
+		AkMemBlock * pMemBlockForTransfer;
+		if ( in_pMemBlock->IsBusy() )
 		{
-			// Could not create a temporary block!
-			// Get rid of mem view.
-			DestroyMemView( pMemView );
-			return NULL;
+			m_mgrMemIO.CloneTempBlock( in_pMemBlock, pMemBlockForTransfer );
+			if ( !pMemBlockForTransfer )
+			{
+				// Could not create a temporary block!
+				// Get rid of mem view.
+				DestroyMemView( pMemView );
+				return NULL;
+			}
 		}
+		else
+			pMemBlockForTransfer = in_pMemBlock;
+
+
+		// Create a low-level transfer (must succeed) and attach it to the memblock.
+		out_pLowLevelXfer = CreateLowLevelTransfer( 
+			in_pOwner,			// Owner task.
+			(AkUInt8*)pMemBlockForTransfer->pData + in_uDataOffset, // Address for transfer.
+			in_uPosition,		// Position in file, relative to start of file.
+			in_uBufferSize,		// Buffer size.
+			in_uRequestedSize	// Requested transfer size.
+			);
+		AKASSERT( out_pLowLevelXfer );	// Cannot fail.
+		pMemBlockForTransfer->pTransfer = out_pLowLevelXfer;
+
+		// Create a view to this memory block. The offset is the size that has been read already.
+		pMemView->Attach( pMemBlockForTransfer, in_uDataOffset );
+
+		// Add ourselves to low-level transfer's observers list if there is a transfer.
+		out_pLowLevelXfer->AddObserver( pMemView );
+
+		// Enqueue new transfer request.
+		in_pOwner->PushTransferRequest( pMemView );
 	}
-	else
-		pMemBlockForTransfer = in_pMemBlock;
-		
-
-	// Create a low-level transfer (must succeed) and attach it to the memblock.
-	out_pLowLevelXfer = CreateLowLevelTransfer( 
-		in_pOwner,			// Owner task.
-		(AkUInt8*)pMemBlockForTransfer->pData + in_uDataOffset, // Address for transfer.
-		in_uPosition,		// Position in file, relative to start of file.
-		in_uBufferSize,		// Buffer size.
-		in_uRequestedSize	// Requested transfer size.
-		);
-	AKASSERT( out_pLowLevelXfer );	// Cannot fail.
-	pMemBlockForTransfer->pTransfer = out_pLowLevelXfer;
-
-	// Create a view to this memory block. The offset is the size that has been read already.
-	pMemView->Attach( pMemBlockForTransfer, in_uDataOffset );
-
-	// Add ourselves to low-level transfer's observers list if there is a transfer.
-	out_pLowLevelXfer->AddObserver( pMemView );
-	
-	// Enqueue new transfer request.
-	in_pOwner->PushTransferRequest( pMemView );
 
 	return pMemView;
 }
@@ -383,19 +369,17 @@ CAkStmMemViewDeferred * CAkDeviceDeferredLinedUp::CreateMemViewAuto(
 	AkUInt32		in_uMinSize,		// Minimum data size acceptable (discard otherwise).
 	AkUInt32		in_uRequiredAlign,	// Required data alignment.
 	bool			in_bEof,			// True if desired block is last of file.
+	bool			in_bCacheOnly,		// Get a view of cached data only, otherwise return NULL.
 	AkUInt32 &		io_uRequestedSize,	// In: desired data size; Out: returned valid size.
-	CAkLowLevelTransferDeferred *& out_pLowLevelXfer	// Returned low-level transfer if it was needed. Device must push it to the Low-Level IO. NULL otherwise.
+	CAkLowLevelTransferDeferred *& out_pNewLowLevelXfer,	// Returned low-level transfer if it was created. Device must push it to the Low-Level IO. NULL otherwise.
+	bool & out_bExistingLowLevelXfer // Set to true if a low level transfer already exists for the memory block that is referenced by the returned view.
 	)
 {
-	out_pLowLevelXfer = NULL;
+	out_pNewLowLevelXfer = NULL;
+	out_bExistingLowLevelXfer = false;
 
 	// I/O pool access must be enclosed in scheduler lock.
 	AkAutoLock<CAkIOThread> deviceLock( *this );
-
-	// Create a new streaming memory view for this transfer.
-	// If this fails, everything fails.
-	CAkStmMemViewDeferred * pMemView = (CAkStmMemViewDeferred*)MemViewFactory();
-	AKASSERT( pMemView || !"Mem views exceed the maximum amount allowed" );
 
 	AkMemBlock * pMemBlock = NULL;
 
@@ -403,67 +387,93 @@ CAkStmMemViewDeferred * CAkDeviceDeferredLinedUp::CreateMemViewAuto(
 	// buffer size acceptable is equal to m_uMinBufferSize (user-specified buffer constraint), 
 	// unless io_uRequestedSize is smaller (which typically occurs at the end of file).
 	AkUInt32 uOffset = ( m_mgrMemIO.UseCache() && in_fileID != AK_INVALID_FILE_ID ) ? m_mgrMemIO.GetCachedBlock(
-							in_fileID,
-							in_uPosition, 
-							in_uMinSize,
-							in_uRequiredAlign, 
-							in_bEof,
-							io_uRequestedSize, 
-							pMemBlock ) : 0;
+		in_fileID,
+		in_uPosition, 
+		in_uMinSize,
+		in_uRequiredAlign, 
+		in_bEof,
+		io_uRequestedSize, 
+		pMemBlock ) : 0;
 
-	if ( !pMemBlock )
-	{
-		// Nothing useful in cache. Acquire free buffer.
-		AKASSERT( uOffset == 0 );
-		m_mgrMemIO.GetOldestFreeBlock( pMemBlock );
-		if ( pMemBlock )
+	if ( in_bCacheOnly ) //Requested a cache-only transfer. We got some special rules to follow here.
+	{ 
+		if ( pMemBlock == NULL )
 		{
-			// Got a new block. Create a new low-level transfer and tag block.
-			out_pLowLevelXfer = CreateLowLevelTransfer( 
-				in_pOwner, 
-				pMemBlock->pData, 
-				in_uPosition, 
-				m_uGranularity, 
-				io_uRequestedSize 
-				);
-			AKASSERT( out_pLowLevelXfer );
-
-			m_mgrMemIO.TagBlock( 
-				pMemBlock, 
-				out_pLowLevelXfer, 
-				in_fileID, 
-				in_uPosition, 
-				io_uRequestedSize 
-				);
-
-			// Memory block obtained requires an IO transfer. Effective address points 
-			// at the beginning of the block. io_uRequestedSize is unchanged.
-			// Create a view to this memory block and add ourselves to low-level as the first transfer's observers.
-			pMemView->Attach( pMemBlock, 0 );
-			out_pLowLevelXfer->AddObserver( pMemView );
+			return NULL;
 		}
-		else
+		else if ( pMemBlock->IsBusy() )
 		{
-			// No memory. Get rid of mem view and notify out of memory.
-			DestroyMemView( pMemView );
-			NotifyMemIdle();
+			// If using cached data, we need to ensure that the block is not currently being filled up.
+			m_mgrMemIO.ReleaseBlock( pMemBlock );
 			return NULL;
 		}
 	}
-	else
+
+	// Create a new streaming memory view for this transfer.
+	// If this fails, everything fails.
+	CAkStmMemViewDeferred * pMemView = (CAkStmMemViewDeferred*)MemViewFactory();
+	if (pMemView)
 	{
-		// Using cache.
-		// Create a view to this memory block and add ourselves to low-level transfer's observers list 
-		// if there is a transfer.
-		pMemView->Attach( pMemBlock, uOffset );
-		out_pLowLevelXfer = (CAkLowLevelTransferDeferred*)pMemBlock->pTransfer;
-		if ( out_pLowLevelXfer )
-			out_pLowLevelXfer->AddObserver( pMemView );
+		if ( !pMemBlock )
+		{
+			// Nothing useful in cache. Acquire free buffer.
+			AKASSERT( uOffset == 0 );
+			m_mgrMemIO.GetOldestFreeBlock( io_uRequestedSize, in_uRequiredAlign, pMemBlock );
+			if ( pMemBlock )
+			{
+				// Got a new block. Create a new low-level transfer and tag block.
+				out_pNewLowLevelXfer = CreateLowLevelTransfer(
+					in_pOwner, 
+					pMemBlock->pData, 
+					in_uPosition, 
+					pMemBlock->uAllocSize, //Make sure to pass entire alloc size, which is block alligned.
+					io_uRequestedSize 
+					);
+				AKASSERT(out_pNewLowLevelXfer);
+
+				//NOTE:  Tagging the memory block can fail.  This will just mean that we can not re-use the block in cache.
+				m_mgrMemIO.TagBlock( 
+									pMemBlock, 
+									out_pNewLowLevelXfer,
+									in_fileID, 
+									in_uPosition, 
+									io_uRequestedSize 
+									);
+
+				// Memory block obtained requires an IO transfer. Effective address points 
+				// at the beginning of the block. io_uRequestedSize is unchanged.
+				// Create a view to this memory block and add ourselves to low-level as the first transfer's observers.
+				pMemView->Attach( pMemBlock, 0 );
+				out_pNewLowLevelXfer->AddObserver(pMemView);
+			}
+			else
+			{
+				// No memory. Get rid of mem view and notify out of memory.
+				DestroyMemView( pMemView );
+				return NULL;
+			}
+		}
+		else
+		{
+			// Using cache.
+			// Create a view to this memory block and add ourselves to low-level transfer's observers list 
+			// if there is a transfer.
+			pMemView->Attach( pMemBlock, uOffset );
+			CAkLowLevelTransferDeferred* pLowLevelXfer = (CAkLowLevelTransferDeferred*)pMemBlock->pTransfer;
+			if ( pLowLevelXfer )
+			{
+				//NOTE: *do not* pass out pLowLevelXfer.  This transfer is in use, and can be deleted at any time after the lock is released.
+				//	Instead we return a boolean indicating that the transfer exists and will be updated when it is completed.
+				pLowLevelXfer->AddObserver( pMemView );
+				out_bExistingLowLevelXfer = true;
+			}
+			
+		}
+
+		// Enqueue new transfer request.
+		in_pOwner->PushTransferRequest( pMemView );
 	}
-
-	// Enqueue new transfer request.
-	in_pOwner->PushTransferRequest( pMemView );
-
+	
 	return pMemView;
 }
 
@@ -560,16 +570,24 @@ void CAkStdStmDeferredLinedUp::Destroy()
 CAkStmMemView * CAkStdStmDeferredLinedUp::PrepareTransfer( 
 	AkFileDesc *&			out_pFileDesc,		// Stream's associated file descriptor.
 	CAkLowLevelTransfer *&	out_pLowLevelXfer,	// Low-level transfer. Set to NULL if it doesn't need to be pushed to the Low-Level IO.
+	bool &					out_bExistingLowLevelXfer, // Always false for std streams.
 	bool					
-#ifdef _DEBUG 
+#ifdef AK_ENABLE_ASSERTS 
 		in_bCacheOnly		// NOT Supported.
 #endif
 	)
 {
 	AKASSERT( !in_bCacheOnly || !"Not supported" );
 
+	out_pLowLevelXfer = NULL;
+	out_bExistingLowLevelXfer = false;
+
 	// Lock status.
     AkAutoLock<CAkLock> atomicPosition( m_lockStatus );
+
+	// From here on, Update() will have to be called in order to clean this transfer, whether it actually happens or not. 
+	// IO count is decremented in Update().
+	m_pDevice->IncrementIOCount();
 
 	// Status is locked: last chance to bail out if the stream was destroyed by client.
 	if ( m_bIsToBeDestroyed || !ReadyForIO() )
@@ -651,19 +669,21 @@ CAkAutoStmDeferredLinedUp::~CAkAutoStmDeferredLinedUp()
 // Sync: Locks stream's status.
 CAkStmMemView * CAkAutoStmDeferredLinedUp::PrepareTransfer( 
 	AkFileDesc *&			out_pFileDesc,		// Stream's associated file descriptor.
-	CAkLowLevelTransfer *&	out_pLowLevelXfer,	// Low-level transfer. Set to NULL if it doesn't need to be pushed to the Low-Level IO.
-	bool					
-#ifdef _DEBUG 
-		in_bCacheOnly		// NOT Supported.
-#endif
+	CAkLowLevelTransfer *&	out_pNewLowLevelXfer,	// Low-level transfer. Set to NULL if it doesn't need to be pushed to the Low-Level IO.
+	bool				&	out_bExistingLowLevelXfer, // Indicates a low level transfer already exists that references the memory block returned.
+	bool in_bCacheOnly
 	)
 {
-	AKASSERT( !in_bCacheOnly || !"Not supported" );
-
+	out_pNewLowLevelXfer = NULL;
+	out_bExistingLowLevelXfer = false;
 	out_pFileDesc = m_pFileDesc;
 
     // Lock status.
     AkAutoLock<CAkLock> atomicPosition( m_lockStatus );
+
+	// From here on, Update() will have to be called in order to clean this transfer, whether it actually happens or not. 
+	// IO count is decremented in Update().
+	m_pDevice->IncrementIOCount();
 
 	// Status is locked: last chance to bail out if the stream was destroyed by client.
 	if ( m_bIsToBeDestroyed || !ReadyForIO() )
@@ -675,8 +695,12 @@ CAkStmMemView * CAkAutoStmDeferredLinedUp::PrepareTransfer(
 	bool bEof;
 	GetPositionForNextTransfer( uFilePosition, uRequestedSize, bEof );
 
+	//Is is possible for caching streams to be exactly at the end of their prefetch buffer.
+	if (uRequestedSize == 0)
+		return NULL;
+
 	// Get IO buffer.
-	CAkLowLevelTransferDeferred * pLowLevelXfer;
+	CAkLowLevelTransferDeferred * pNewLowLevelXfer;
 	CAkStmMemViewDeferred * pMemView = ((CAkDeviceDeferredLinedUp*)m_pDevice)->CreateMemViewAuto(
 		this,					// Owner task.
 		m_fileID,				// File ID (for cache)
@@ -684,13 +708,15 @@ CAkStmMemView * CAkAutoStmDeferredLinedUp::PrepareTransfer(
 		AkMin( m_uMinBufferSize, uRequestedSize ), // Minimum data size acceptable is min between desired size and buffer constraint.
 		m_uBufferAlignment,		// Required data alignment.
 		bEof,					// True if desired block is last of file.
+		in_bCacheOnly,			// Get a view of cached data only, otherwise return NULL.
 		uRequestedSize,			// In: Desired data size. Out: Valid data size (may be smaller than input if using cache).
-		pLowLevelXfer			// Returned low-level transfer if a new one was created and it needs to be pushed to the Low-Level IO.
+		pNewLowLevelXfer,			// Returned low-level transfer if a new one was created and it needs to be pushed to the Low-Level IO.
+		out_bExistingLowLevelXfer	// Set to true if a low level transfer already exists.
 		);
 	if ( !pMemView )
 		return NULL; 
 
-	out_pLowLevelXfer = pLowLevelXfer;
+	out_pNewLowLevelXfer = pNewLowLevelXfer;
 
 	// m_uVirtualBufferingSize takes looping heuristics into account. Clamp uRequestedSize if applicable.
 	// When looping heuristics change, m_uVirtualBufferingSize is recomputed.
@@ -815,8 +841,6 @@ void CAkAutoStmDeferredLinedUp::FlushSmallBuffersAndPendingTransfers(
 				else
 					++it;
 			}
-			if ( bFlush )
-				m_pDevice->NotifyMemChange();
 		}
 	}
 
@@ -876,6 +900,61 @@ void CAkAutoStmDeferredLinedUp::FlushSmallBuffersAndPendingTransfers(
 			}
 		}
 	}
+}
+
+AkUInt32 CAkAutoStmDeferredLinedUp::ReleaseCachingBuffers(AkUInt32 in_uTargetMemToRecover)
+{
+	AkUInt32 uMemFreed = 0;
+
+	{
+		CAkStmMemView * pTransfer = m_listPendingXfers.Last();
+		while (pTransfer != NULL && uMemFreed < in_uTargetMemToRecover) 
+		{
+			AKASSERT( pTransfer->Status() != CAkStmMemView::TransferStatus_Cancelled
+				|| !"A cancelled transfer is in the pending queue" );
+
+			uMemFreed += pTransfer->Size();
+			AKVERIFY( m_listPendingXfers.Remove( pTransfer ) );
+
+			if ( pTransfer->Status() == CAkStmMemView::TransferStatus_Pending )
+			{
+				AddToCancelledList( pTransfer );
+			}
+			else
+			{
+				CancelCompleted( pTransfer );
+			}
+
+			pTransfer = m_listPendingXfers.Last();
+		}
+	}
+
+	//In case there were some remaining transfers in the pending list that have been completed out of order.
+	UpdateCompletedTransfers();
+
+	// Try to release more memory from the list of buffers by using the base class implementation
+	uMemFreed += CAkAutoStmBase::ReleaseCachingBuffers(in_uTargetMemToRecover-uMemFreed);
+
+	{
+		bool bAllCancelled = m_listPendingXfers.IsEmpty(); //Review
+		bool bCallLowLevelIO = true;
+		AkStmMemViewListLight::Iterator it = m_listCancelledXfers.Begin();
+		while ( it != m_listCancelledXfers.End() )
+		{
+			// IMPORTANT: Cache reference before calling CancelTransfer because it could be dequeued 
+			// inside this function: The Low-Level IO can call Update() directly from this thread.
+			CAkStmMemViewDeferred * pTransfer = (CAkStmMemViewDeferred*)(*it);
+			++it;
+			// This notifies the Low-Level IO or calls Update directly if transfer was already completed.
+			pTransfer->Cancel( 
+				static_cast<IAkIOHookDeferred*>( m_pDevice->GetLowLevelHook() ),
+				bCallLowLevelIO, 
+				bAllCancelled );
+			bCallLowLevelIO = !bAllCancelled;
+		}
+	}
+
+	return uMemFreed;
 }
 
 // Change loop end heuristic. Use this function instead of setting m_uLoopEnd directly because

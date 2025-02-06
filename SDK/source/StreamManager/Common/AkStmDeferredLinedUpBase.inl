@@ -25,6 +25,8 @@ CAkStmDeferredLinedUpBase<TStmBase>::CAkStmDeferredLinedUpBase()
 template <class TStmBase>
 CAkStmDeferredLinedUpBase<TStmBase>::~CAkStmDeferredLinedUpBase()
 {
+	AKASSERT(m_listPendingXfers.IsEmpty());
+	AKASSERT(m_listCancelledXfers.IsEmpty());
 	m_listPendingXfers.Term();
 	m_listCancelledXfers.Term();
 }
@@ -46,12 +48,14 @@ bool CAkStmDeferredLinedUpBase<TStmBase>::CanBeDestroyed()
 // Sync: Locks stream's status.
 // Override Update() to handle completed requests that were not received in the order they were sent.
 template <class TStmBase>
-void CAkStmDeferredLinedUpBase<TStmBase>::Update(
+bool CAkStmDeferredLinedUpBase<TStmBase>::Update(
 	CAkStmMemView *	in_pTransfer,	// Logical transfer object.
 	AKRESULT		in_eIOResult,	// AK_Success if IO was successful, AK_Cancelled if IO was cancelled, AK_Fail otherwise.
 	bool			in_bRequiredLowLevelXfer	// True if this transfer required a call to low-level.
 	)
 {
+	bool bBufferAdded = false;
+
 	// Lock status.
 	AkAutoLock<CAkLock> update( TStmBase::m_lockStatus );
 
@@ -59,11 +63,9 @@ void CAkStmDeferredLinedUpBase<TStmBase>::Update(
 	// one in the queue. If it isn't, tag it as "completed" but let it there without updating.
 	// After updating, always check if the first transfer was tagged as completed in order to resolve it.
 
-	// in_pCookie must be set to valid transfer reference if IO was successful.
-	AKASSERT( in_eIOResult != AK_Success || in_pTransfer );
-
-	bool bStoreData = ( AK_Success == in_eIOResult 
-					&& in_pTransfer->DoStoreData() );
+	bool bStoreData = (in_pTransfer 
+					&& AK_Success == in_eIOResult
+					&& in_pTransfer->DoStoreData());
 
 	if ( bStoreData
 		&& !IsOldestPendingTransfer( in_pTransfer  ) )
@@ -88,29 +90,26 @@ void CAkStmDeferredLinedUpBase<TStmBase>::Update(
 				&& in_pTransfer->Status() != CAkStmMemView::TransferStatus_Ready );
 
 			// Remove transfer object from pending transfers list before updating position (and enqueuing in buffer list).
-			bool bWasCancelled = ( in_pTransfer->Status() == CAkStmMemView::TransferStatus_Cancelled );
 			PopTransferRequest( in_pTransfer, bStoreData );
 
 			// Transfer may be pending, or cancelled. If it was pending but did not require a low-level transfer,
 			// set it to ready now.
-			if ( !in_bRequiredLowLevelXfer && !bWasCancelled )
+			if ( !in_bRequiredLowLevelXfer && (in_pTransfer->Status() != CAkStmMemView::TransferStatus_Cancelled) )
 				in_pTransfer->TagAsReady();
 
 			// Enqueue data ref in buffer list.
 			TStmBase::AddMemView( in_pTransfer, bStoreData );
+	
+			// Update all "completed" transfers whose updating was deferred because they did not arrive in the order in which they were sent.
+			// Even if in_pTransfer was a canceled transfer, there could be out of order, non-canceled completed transfers in the pending list.
+			UpdateCompletedTransfers();
 
-			// If transfer was not cancelled, update all "completed" transfers whose updating was deferred because 
-			// they did not arrive in the order in which they were sent.
-			// However, if the transfer was cancelled, the pending list is not inspected to resolve "completed"
-			// transfers, because an older transfer cannot be cancelled while a new transfer is not.
-			// NOTE: Also, methods that cancel many transfers iterate through the list and call this method:
-			// they count on the fact that the list will remain intact, apart from the transfer they are cancelling.
-			if ( !bWasCancelled )
-				UpdateCompletedTransfers();
+			bBufferAdded = true;
 		}
 
 		TStmBase::UpdateTaskStatus( in_eIOResult );
 
+		// Decrement IO count here. See comment in if() above.
 		TStmBase::m_pDevice->DecrementIOCount();
 
 #ifndef AK_OPTIMIZED
@@ -119,6 +118,8 @@ void CAkStmDeferredLinedUpBase<TStmBase>::Update(
 		TStmBase::m_bCanClearActiveProfile = !TStmBase::m_bRequiresScheduling && m_listPendingXfers.IsEmpty() && m_listCancelledXfers.IsEmpty();
 #endif
 	}
+
+	return bBufferAdded;
 }
 
 template <class TStmBase>
@@ -134,6 +135,7 @@ void CAkStmDeferredLinedUpBase<TStmBase>::UpdateCompletedTransfers()
 		// Enqueue in buffer list.
 		TStmBase::AddMemView( pOldestTransfer, true );
 
+		// Decrement IO count here. See comment in Update() above when tagging transfers as "completed".
 		TStmBase::m_pDevice->DecrementIOCount();
 
 		pOldestTransfer = GetOldestCompletedTransfer();
@@ -168,7 +170,7 @@ void CAkStmDeferredLinedUpBase<TStmBase>::PopTransferRequest(
 		}
 		else
 		{
-#ifdef _DEBUG
+#ifdef AK_ENABLE_ASSERTS
 			bool bFound = false;
 #endif
 			// If there was an error, this transfer could be in any order. Search it.
@@ -178,7 +180,7 @@ void CAkStmDeferredLinedUpBase<TStmBase>::PopTransferRequest(
 				if ( (*it) == in_pTransfer )
 				{
 					m_listPendingXfers.Erase( it );
-#ifdef _DEBUG
+#ifdef AK_ENABLE_ASSERTS
 					bFound = true;
 #endif
 					break;
@@ -190,7 +192,7 @@ void CAkStmDeferredLinedUpBase<TStmBase>::PopTransferRequest(
 	}
 	else
 	{
-#ifdef _DEBUG
+#ifdef AK_ENABLE_ASSERTS
 		bool bFound = false;
 #endif
 		AkStmMemViewListLight::IteratorEx it = m_listCancelledXfers.BeginEx();
@@ -199,7 +201,7 @@ void CAkStmDeferredLinedUpBase<TStmBase>::PopTransferRequest(
 			if ( (*it) == in_pTransfer )
 			{
 				m_listCancelledXfers.Erase( it );
-#ifdef _DEBUG
+#ifdef AK_ENABLE_ASSERTS
 				bFound = true;
 #endif
 				break;
@@ -243,6 +245,9 @@ void CAkStmDeferredLinedUpBase<TStmBase>::CancelTransfers(
 		}
 	}
 
+	//In case there were some remaining transfers in the pending list that have been completed out of order.
+	UpdateCompletedTransfers();
+
 	{
 		bool bCallLowLevelIO = true;
 		AkStmMemViewListLight::Iterator it = m_listCancelledXfers.Begin();
@@ -277,6 +282,8 @@ void CAkStmDeferredLinedUpBase<TStmBase>::CancelCompleted(
 	TStmBase::AddMemView( 
 		in_pTransfer,
 		false );
+
+	TStmBase::m_pDevice->DecrementIOCount();
 }
 
 // Returns true if the given transfer object is the oldest PENDING transfer of the queue.

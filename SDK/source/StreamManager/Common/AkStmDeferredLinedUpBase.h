@@ -51,7 +51,7 @@ namespace StreamMgr
 		// Update stream object after I/O.
 		// Sync: Locks stream's status.
 		// Handles completed requests that were not received in the order they were sent.
-        virtual void Update(
+        virtual bool Update(
 			CAkStmMemView *	in_pTransfer,	// Logical transfer object.
 			AKRESULT		in_eIOResult,	// AK_Success if IO was successful, AK_Cancelled if IO was cancelled, AK_Fail otherwise.
 			bool			in_bRequiredLowLevelXfer	// True if this transfer required a call to low-level.

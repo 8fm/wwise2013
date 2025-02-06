@@ -143,7 +143,9 @@ void AK::StreamMgr::GetDefaultDeviceSettings(
 	out_settings.fTargetAutoStmBufferLength = AK_DEFAULT_DEVICE_BUFFERING_LENGTH;
 	out_settings.uMaxConcurrentIO			= AK_DEFAULT_MAX_CONCURRENT_IO;
 
-	out_settings.fMaxCacheRatio			= AK_DEFAULT_DEVICE_MAX_CACHE_RATIO;
+	out_settings.bUseStreamCache			= AK_DEFAULT_DEVICE_CACHE_ENABLED;
+
+	out_settings.uMaxCachePinnedBytes	= (AkUInt32)-1; //Unlimited;
 }
 
 AK::StreamMgr::IAkFileLocationResolver * AK::StreamMgr::GetFileLocationResolver()
@@ -401,6 +403,16 @@ CAkStreamMgr::CAkStreamMgr()
 
 CAkStreamMgr::~CAkStreamMgr()
 {
+	for (CachedFileStreamDataMap::Iterator it = m_cachedFileStreams.Begin(); it !=m_cachedFileStreams.End(); ++it)
+	{
+		CachedFileStreamDataStruct& stct = (*it).item;
+		AKASSERT (stct.pData && stct.pData->pStream);
+		stct.pData->pStream->Destroy();
+		stct.pData->pStream = NULL;
+		stct.FreeData();
+	}
+	m_cachedFileStreams.Term();
+
     // Reset global pointer.
     m_pStreamMgr = NULL;
 }
@@ -872,17 +884,17 @@ AKRESULT CAkStreamMgr::CreateAuto(
 	bool						in_bSyncOpen		// If true, force the Stream Manager to open file synchronously. Otherwise, it is left to its discretion.
     )
 {
-    // Check parameters.
-    if ( in_heuristics.fThroughput < 0 ||
-         in_heuristics.priority < AK_MIN_PRIORITY ||
-         in_heuristics.priority > AK_MAX_PRIORITY )
-    {
-        AKASSERT( !"Invalid automatic stream heuristic" );
-        return AK_InvalidParameter;
-    }
+	// Check parameters.
+	if ( in_heuristics.fThroughput < 0 ||
+		in_heuristics.priority < AK_MIN_PRIORITY ||
+		in_heuristics.priority > AK_MAX_PRIORITY )
+	{
+		AKASSERT( !"Invalid automatic stream heuristic" );
+		return AK_InvalidParameter;
+	}
 
 	AKASSERT( m_pFileLocationResolver
-			|| !"File location resolver was not set on the Stream Manager" );
+		|| !"File location resolver was not set on the Stream Manager" );
 
 	AkFileID fileIDForCaching = AK_INVALID_FILE_ID;
 	// Set AkFileSystemFlags::bIsAutomaticStream if flags are specified.
@@ -892,49 +904,47 @@ AKRESULT CAkStreamMgr::CreateAuto(
 		// Take cache ID if specified. Otherwise use the file ID if called from Wwise sound engine.
 		if ( in_pFSFlags->uCacheID != AK_INVALID_FILE_ID )
 			fileIDForCaching = in_pFSFlags->uCacheID;
-		else if ( in_pFSFlags->uCompanyID == AKCOMPANYID_AUDIOKINETIC )
-			fileIDForCaching = in_fileID;
 	}
 
-    AkFileDesc * pFileDesc = (AkFileDesc*)AkAlloc( CAkStreamMgr::GetObjPoolID(), sizeof( AkFileDesc ) );
+	AkFileDesc * pFileDesc = (AkFileDesc*)AkAlloc( CAkStreamMgr::GetObjPoolID(), sizeof( AkFileDesc ) );
 	if ( !pFileDesc )
 		return AK_Fail;
 	memset( pFileDesc, 0, sizeof( AkFileDesc ) );
 	bool bSyncOpen = in_bSyncOpen;
-    AKRESULT eRes = m_pFileLocationResolver->Open( 
+	AKRESULT eRes = m_pFileLocationResolver->Open( 
 		in_fileID,
 		AK_OpenModeRead,  // Always read from an autostream.
 		in_pFSFlags,
 		bSyncOpen,
 		*pFileDesc );
 
-    if ( eRes != AK_Success )
-    {
-    	AkFree( CAkStreamMgr::GetObjPoolID(), pFileDesc );
-    	
+	if ( eRes != AK_Success )
+	{
+		AkFree( CAkStreamMgr::GetObjPoolID(), pFileDesc );
+
 #ifndef AK_OPTIMIZED
-        // Monitor error.
+		// Monitor error.
 		AkOSChar szMsg[ 64 ];
 		OS_PRINTF( szMsg, ( AK_FileNotFound == eRes ) ? AKTEXT("File not found: %u") : AKTEXT("Cannot open file: %u"),  in_fileID );
 		AK::Monitor::PostString( szMsg, AK::Monitor::ErrorLevel_Error );
 #endif
-        return eRes;
-    }
+		return eRes;
+	}
 
-    CAkDeviceBase * pDevice = GetDevice( pFileDesc->deviceID );
-    if ( !pDevice )
+	CAkDeviceBase * pDevice = GetDevice( pFileDesc->deviceID );
+	if ( !pDevice )
 	{
 		AkFree( CAkStreamMgr::GetObjPoolID(), pFileDesc );
 		AKASSERT( !"File Location Resolver returned an invalid device ID" );
-        return AK_Fail;
+		return AK_Fail;
 	}
 
-    IAkAutoStream * pStream = NULL;
+	IAkAutoStream * pStream = NULL;
 	CAkStmTask * pTask = pDevice->CreateAuto( 
 		pFileDesc,
 		fileIDForCaching,
-        in_heuristics,
-        in_pBufferSettings,
+		in_heuristics,
+		in_pBufferSettings,
 		pStream );
 
 	if ( !pTask )
@@ -944,7 +954,7 @@ AKRESULT CAkStreamMgr::CreateAuto(
 		AkFree( CAkStreamMgr::GetObjPoolID(), pFileDesc );
 		return AK_Fail;
 	}
-	
+
 	if ( bSyncOpen )
 	{
 		pTask->SetFileOpen( pFileDesc );
@@ -954,6 +964,250 @@ AKRESULT CAkStreamMgr::CreateAuto(
 		// Debug check sync flag.
 		AKASSERT( !in_bSyncOpen || !"Cannot defer open when asked for synchronous" );
 
+		// Low-level File Location Resolver wishes to open the file later. Create a
+		// DeferredFileOpenRecord for it.
+		if ( pTask->SetDeferredFileOpen( pFileDesc, in_fileID, in_pFSFlags, AK_OpenModeRead ) != AK_Success )
+		{
+			// Could not set info for deferred open. Mark this task for clean up.
+			pTask->SetToBeDestroyed();
+			pTask->Kill();
+			return AK_Fail;
+		}
+	}
+
+	out_pStream = pStream;
+	return AK_Success;
+}
+
+// Cache pinning mechanism.
+// ------------------------------
+
+AKRESULT CAkStreamMgr::PinFileInCache(
+	AkFileID                    in_fileID,          // Application defined ID.
+	AkFileSystemFlags *         in_pFSFlags,        // Special file system flags. Can pass NULL.
+	AkPriority					in_uPriority
+	)
+{
+	AKRESULT res = AK_Fail;
+	CachedFileStreamDataStruct* pStruct = m_cachedFileStreams.Exists( in_fileID );
+	if (pStruct)
+	{
+		CachedFileStreamData* pData = pStruct->pData;
+		AKASSERT(pData);
+		AKASSERT(pData->pStream);
+		
+		if ( pData->AddRef( in_uPriority ) )
+		{
+			CAkAutoStmBase* pAutoStream = static_cast<CAkAutoStmBase*>(pData->pStream);
+			pAutoStream->GetDevice()->UpdateCachingPriority(pAutoStream, pData->GetPriority() );
+			res =  AK_Success;
+		}
+		
+	}
+	else
+	{
+		pStruct = m_cachedFileStreams.Set( in_fileID );
+		if (pStruct)
+		{
+			if ( pStruct->AllocData() ) 
+		{
+				CachedFileStreamData* pData = pStruct->pData;
+
+			if ( AK_Success == CreateCachingStream( in_fileID, in_pFSFlags, in_uPriority, pData->pStream ) )
+			{
+					AKASSERT( pData->pStream );
+
+					pData->AddRef(in_uPriority);
+
+				const unsigned long MAX_NUMBER_STR_SIZE = 11;
+				AkOSChar szName[MAX_NUMBER_STR_SIZE];
+				AK_OSPRINTF( szName, MAX_NUMBER_STR_SIZE, AKTEXT("%u"), in_fileID );
+				pData->pStream->SetStreamName( szName );
+				pData->pStream->Start();
+
+				res = AK_Success;
+			}
+			else
+			{
+				//Failed to create the stream.
+				pStruct->FreeData();
+				m_cachedFileStreams.Unset(in_fileID);
+				pData = NULL;
+				pStruct = NULL;
+				res = AK_Fail;
+			}
+		}
+			else
+	{
+				//Failed to allocate data
+				m_cachedFileStreams.Unset(in_fileID);
+				pStruct = NULL;
+				res = AK_Fail;
+			}
+		}
+	}
+
+	return res;
+}
+
+AKRESULT CAkStreamMgr::UnpinFileInCache(
+	AkFileID                    in_fileID,          // Application defined ID.
+	AkPriority					in_uPriority
+	)
+{
+	AKRESULT res = AK_Fail;
+
+	CachedFileStreamDataStruct* pStruct = m_cachedFileStreams.Exists( in_fileID );
+	if (pStruct)
+	{
+		CachedFileStreamData* pData = pStruct->pData;
+		AKASSERT(pData);
+
+		if ( pData->Release(in_uPriority) )
+		{
+			if ( pData->pStream != NULL )
+			{
+				pData->pStream->Destroy();
+				pData->pStream = NULL;
+			}
+			pStruct->FreeData();
+			m_cachedFileStreams.Unset(in_fileID);
+			pStruct = NULL;
+			res = AK_Success;
+		}
+		else
+		{
+			CAkAutoStmBase* pAutoStream = static_cast<CAkAutoStmBase*>(pData->pStream);
+			pAutoStream->GetDevice()->UpdateCachingPriority(pAutoStream, pData->GetPriority() );
+		}
+	}
+
+	return res;
+}
+
+AKRESULT CAkStreamMgr::UpdateCachingPriority(
+										AkFileID                    in_fileID,          // Application defined ID.
+										AkPriority					in_uPriority,
+										AkPriority					in_uOldPriority
+										)
+{
+	AKRESULT res = AK_Fail;
+	CachedFileStreamDataStruct* pStruct = m_cachedFileStreams.Exists( in_fileID );
+	if (pStruct)
+	{
+		CachedFileStreamData* pData = pStruct->pData;
+		AKASSERT(pData);
+		AKASSERT(pData->pStream);
+		if ( pData->UpdatePriority(in_uPriority, in_uOldPriority) )
+		{
+		CAkAutoStmBase* pAutoStream = static_cast<CAkAutoStmBase*>(pData->pStream);
+			pAutoStream->GetDevice()->UpdateCachingPriority(pAutoStream, pData->GetPriority() );
+		res = AK_Success;
+	}
+	}
+	return res;
+}
+
+AKRESULT CAkStreamMgr::GetBufferStatusForPinnedFile( AkFileID in_fileID , AkReal32& out_fPercentBuffered, bool& out_bCacheFull )
+{
+	out_fPercentBuffered = 0.f;
+	out_bCacheFull = false;
+
+	AKRESULT res = AK_Fail;
+	CachedFileStreamDataStruct* pStruct = m_cachedFileStreams.Exists( in_fileID );
+	if (pStruct)
+	{
+		CachedFileStreamData* pData = pStruct->pData;
+		AKASSERT(pData);
+		AKASSERT(pData->pStream);
+
+		CAkAutoStmBase* pAutoStream = static_cast<CAkAutoStmBase*>(pData->pStream);
+		
+		AkUInt32 uCachingBufferSize = pAutoStream->GetNominalBuffering();
+		AkUInt32 uBufferedBytes = pAutoStream->GetVirtualBufferingSize();
+
+		out_fPercentBuffered = ((AkReal32)uBufferedBytes / (AkReal32)uCachingBufferSize) * 100.f;
+		out_bCacheFull = ( uBufferedBytes < uCachingBufferSize ) && 
+						 ( (uCachingBufferSize - uBufferedBytes) > pAutoStream->GetDevice()->RemainingCachePinnedBytes() );
+		res = AK_Success;
+	}
+
+	return res;
+}
+
+// ID overload.
+AKRESULT CAkStreamMgr::CreateCachingStream(
+								  AkFileID                    in_fileID,          // Application defined ID.
+								  AkFileSystemFlags *         in_pFSFlags,        // Special file system flags. Can NOT be NULL.
+								  AkPriority				  in_uPriority,								 
+								  IAkAutoStream*&            out_pStream		// Returned interface to an automatic stream.
+								  )
+{
+	AKASSERT( m_pFileLocationResolver || !"File location resolver was not set on the Stream Manager" );
+
+	AKASSERT ( in_pFSFlags );
+	in_pFSFlags->bIsAutomaticStream = true;
+
+	AkFileDesc * pFileDesc = (AkFileDesc*)AkAlloc( CAkStreamMgr::GetObjPoolID(), sizeof( AkFileDesc ) );
+	if ( !pFileDesc )
+		return AK_Fail;
+	memset( pFileDesc, 0, sizeof( AkFileDesc ) );
+	bool bSyncOpen = false;
+	AKRESULT eRes = m_pFileLocationResolver->Open( 
+		in_fileID,
+		AK_OpenModeRead,  // Always read from an autostream.
+		in_pFSFlags,
+		bSyncOpen,
+		*pFileDesc );
+
+	if (in_pFSFlags->uNumBytesPrefetch == 0) // the resolver may have changed this value)
+	{
+		eRes = AK_Fail;
+	}
+
+	if ( eRes != AK_Success )
+	{
+		AkFree( CAkStreamMgr::GetObjPoolID(), pFileDesc );
+
+#ifndef AK_OPTIMIZED
+		// Monitor error.
+		AkOSChar szMsg[ 64 ];
+		OS_PRINTF( szMsg, ( AK_FileNotFound == eRes ) ? AKTEXT("File not found: %u") : AKTEXT("Cannot open file: %u"),  in_fileID );
+		AK::Monitor::PostString( szMsg, AK::Monitor::ErrorLevel_Error );
+#endif
+		return eRes;
+	}
+
+	CAkDeviceBase * pDevice = GetDevice( pFileDesc->deviceID );
+	if ( !pDevice )
+	{
+		AkFree( CAkStreamMgr::GetObjPoolID(), pFileDesc );
+		AKASSERT( !"File Location Resolver returned an invalid device ID" );
+		return AK_Fail;
+	}
+
+	IAkAutoStream * pStream = NULL;
+	CAkStmTask * pTask = pDevice->CreateCachingStream( 
+		pFileDesc,
+		in_fileID,
+		in_pFSFlags->uNumBytesPrefetch,
+		in_uPriority,
+		pStream );
+
+	if ( !pTask )
+	{
+		if ( bSyncOpen )
+			pDevice->GetLowLevelHook()->Close( *pFileDesc );
+		AkFree( CAkStreamMgr::GetObjPoolID(), pFileDesc );
+		return AK_Fail;
+	}
+
+	if ( bSyncOpen )
+	{
+		pTask->SetFileOpen( pFileDesc );
+	}
+	else
+	{
 		// Low-level File Location Resolver wishes to open the file later. Create a
 		// DeferredFileOpenRecord for it.
 		if ( pTask->SetDeferredFileOpen( pFileDesc, in_fileID, in_pFSFlags, AK_OpenModeRead ) != AK_Success )
@@ -1023,7 +1277,9 @@ AKRESULT CAkStreamMgr::StartMonitoring()
     for ( AkUInt32 u=0; u<m_arDevices.Length( ); u++ )
     {
 		if ( m_arDevices[u] )
+		{
         	AKVERIFY( m_arDevices[u]->StartMonitoring( ) == AK_Success );
+		}
     }
     return AK_Success;
 }
