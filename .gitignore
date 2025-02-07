@@ -1,0 +1,9 @@
+# ignore Authoring folder
+Authoring/
+
+# ignore temp files
+.vs/
+*.user
+
+# ignore src builded files
+SDK/*_vc*/
