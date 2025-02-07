@@ -17,7 +17,12 @@
 #endif
 
 // Plug-ins
+#define INTEGRATIONDEMO_SRC_BUILD
+#ifdef INTEGRATIONDEMO_SRC_BUILD
+#include "../../IntegrationDemo/Common/AllSrcPluginsRegistrationHelpers.h"
+#else
 #include <AK/Plugin/AllPluginsRegistrationHelpers.h>
+#endif
 
 // Defines.
 
