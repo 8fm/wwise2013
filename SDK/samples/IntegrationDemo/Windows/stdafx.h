@@ -14,7 +14,9 @@
 
 #define WIN32_LEAN_AND_MEAN	
 #define DIRECTINPUT_VERSION 0x0800
-#define snprintf _snprintf
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
+	#define snprintf _snprintf
+#endif
 #include <windows.h>
 #include <dinput.h>
 #include <xinput.h>
