@@ -289,6 +289,7 @@ namespace AK
 		static AKRESULT RegisterConvolutionReverbPlugin()
 		{
 			AKRESULT eFinal = AK_Success;
+#ifndef INTEGRATIONDEMO_SRC_BUILD
 #ifdef AK_SOFTWARE_EFFECT_PLATFORM
 		AK_CHECK_ERROR( AK::SoundEngine::RegisterPlugin( 
 				AkPluginTypeEffect, 
@@ -297,6 +298,7 @@ namespace AK
 				CreateConvolutionReverbFX,
 				CreateConvolutionReverbFXParams ) );
 #endif
+#endif // INTEGRATIONDEMO_SRC_BUILD
 			return eFinal;
 		}
 
@@ -305,6 +307,7 @@ namespace AK
 		static AKRESULT RegisterMcDSPPlugins()
 		{
 			AKRESULT eFinal = AK_Success;
+#ifndef INTEGRATIONDEMO_SRC_BUILD
 #ifdef AK_SOFTWARE_EFFECT_PLATFORM
 			AK_CHECK_ERROR( AK::SoundEngine::RegisterPlugin( 
 				AkPluginTypeEffect, 
@@ -320,6 +323,7 @@ namespace AK
 				CreateMcDSPML1FX,
 				CreateMcDSPML1FXParams ) );
 #endif
+#endif // INTEGRATIONDEMO_SRC_BUILD
 
 			return eFinal;
 		}
@@ -329,6 +333,7 @@ namespace AK
 		static AKRESULT RegisterAstoundSoundPlugins()
 		{
 			AKRESULT eFinal = AK_Success;
+#ifndef INTEGRATIONDEMO_SRC_BUILD
 #if ( defined( AK_WIN ) && !defined( AK_USE_METRO_API ) ) || defined( AK_PS4 ) || defined( AK_XBOXONE ) || defined( AK_ANDROID ) || defined( AK_IOS )
 			
 			AK_CHECK_ERROR( AK::SoundEngine::RegisterPlugin( 
@@ -352,6 +357,7 @@ namespace AK
 				CreateAstoundSoundFolddownFX,
 				CreateAstoundSoundFolddownFXParams ) );
 #endif
+#endif // INTEGRATIONDEMO_SRC_BUILD
 
 			return eFinal;
 		}
@@ -361,6 +367,7 @@ namespace AK
 		static AKRESULT RegisteriZotopePlugins()
 		{
 			AKRESULT eFinal = AK_Success;
+#ifndef INTEGRATIONDEMO_SRC_BUILD
 #if ( defined( AK_WIN ) && !defined( AK_USE_METRO_API ) ) || defined( AK_XBOX360 ) || defined( AK_PS3 ) || defined( AK_XBOXONE ) || defined( AK_PS4 )
 			AK_CHECK_ERROR( AK::SoundEngine::RegisterPlugin( 
 				AkPluginTypeEffect, 
@@ -413,6 +420,7 @@ namespace AK
 				CreateHybridReverbFX,
 				CreateHybridReverbFXParams ) );
 #endif
+#endif // INTEGRATIONDEMO_SRC_BUILD
 
 			return eFinal;
 		}
@@ -421,6 +429,7 @@ namespace AK
 		{
 			AKRESULT eFinal = AK_Success;
 
+#ifndef INTEGRATIONDEMO_SRC_BUILD
 #if ( defined( AK_WIN ) && !defined( AK_USE_METRO_API ) ) || defined( AK_PS4 ) || defined( AK_XBOXONE ) || defined( AK_XBOX360 )
 
 			AK_CHECK_ERROR( AK::SoundEngine::RegisterPlugin( 
@@ -430,6 +439,7 @@ namespace AK
 				CreateREVModelPlayerSource,
 				CreateREVModelPlayerSourceParams ) );
 #endif
+#endif // INTEGRATIONDEMO_SRC_BUILD
 			return eFinal;
 		}
 
@@ -438,6 +448,7 @@ namespace AK
 		static AKRESULT RegisterSoundSeedPlugins()
 		{
 			AKRESULT eFinal = AK_Success;
+#ifndef INTEGRATIONDEMO_SRC_BUILD
 #ifdef AK_SOFTWARE_EFFECT_PLATFORM
 			AK_CHECK_ERROR( AK::SoundEngine::RegisterPlugin( 
 				AkPluginTypeEffect, 
@@ -462,6 +473,7 @@ namespace AK
 				CreateSoundSeedWoosh,
 				CreateSoundSeedWooshParams ) );
 #endif
+#endif // INTEGRATIONDEMO_SRC_BUILD
 
 			return eFinal;
 		}

@@ -14,6 +14,7 @@
 
 #define WIN32_LEAN_AND_MEAN	
 #define DIRECTINPUT_VERSION 0x0800
+#define INTEGRATIONDEMO_SRC_BUILD
 #if defined(_MSC_VER) && (_MSC_VER < 1900)
 	#define snprintf _snprintf
 #endif

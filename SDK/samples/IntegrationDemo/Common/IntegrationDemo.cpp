@@ -8,7 +8,11 @@
 #include "AkFilePackageLowLevelIOBlocking.h"		// Low level io
 
 #include "IntegrationDemo.h"
+#ifndef INTEGRATIONDEMO_SRC_BUILD
 #include <AK/Plugin/AllPluginsRegistrationHelpers.h>	// Plug-ins
+#else
+#include "AllSrcPluginsRegistrationHelpers.h"
+#endif
 #ifdef AK_MOTION
 #include <AK/MotionEngine/Common/AkMotionEngine.h>	// Motion Engine (required only for playback of Motion objects)
 #endif // AK_MOTION
