@@ -235,7 +235,7 @@
 	</PropertyGroup>
 	<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
 		<ClCompile>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 			<PreprocessorDefinitions>_DEBUG;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
 			<PrecompiledHeader>Use</PrecompiledHeader>
 			<PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
@@ -244,12 +244,12 @@
 		</ClCompile>
 		<ResourceCompile>
 			<PreprocessorDefinitions>_DEBUG;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 		</ResourceCompile>
 		<Link>
 			<AdditionalDependencies>AkTremoloFX.lib;AkMemoryMgr.lib;AkMotionGenerator.lib;AkSineSource.lib;AkStereoDelayFX.lib;AkGuitarDistortionFX.lib;AkRumble.lib;AkSoundEngine.lib;AkMP3Source.lib;AkRoomVerbFX.lib;AkParametricEQFX.lib;AkToneSource.lib;AkFlangerFX.lib;AkCompressorFX.lib;AkAudioInputSource.lib;AkMusicEngine.lib;AkDelayFX.lib;AkPitchShifterFX.lib;AkSilenceSource.lib;AkGainFX.lib;AkVorbisDecoder.lib;AkTimeStretchFX.lib;AkMatrixReverbFX.lib;AkMeterFX.lib;AkStreamMgr.lib;AkHarmonizerFX.lib;AkPeakLimiterFX.lib;AkExpanderFX.lib;dxguid.lib;ws2_32.lib;dinput8.lib;Dsound.lib;XInput.lib;Msacm32.lib;Dbghelp.lib;d3d9.lib;D3dx9.lib;Winmm.lib;CommunicationCentral.lib;%(AdditionalDependencies)</AdditionalDependencies>
 			<OutputFile>$(OutDir)IntegrationDemo.exe</OutputFile>
-			<AdditionalLibraryDirectories>&quot;$(DXSDK_DIR)\lib\x86&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+			<AdditionalLibraryDirectories>&quot;..\..\..\..\dxsdk(June2010)\lib\x86&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
 			<SubSystem>Windows</SubSystem>
 			<GenerateDebugInformation>true</GenerateDebugInformation>
 			<TargetMachine>MachineX86</TargetMachine>
@@ -257,7 +257,7 @@
 	</ItemDefinitionGroup>
 	<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
 		<ClCompile>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 			<PreprocessorDefinitions>_DEBUG;WIN64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
 			<PrecompiledHeader>Use</PrecompiledHeader>
 			<PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
@@ -266,12 +266,12 @@
 		</ClCompile>
 		<ResourceCompile>
 			<PreprocessorDefinitions>_DEBUG;WIN64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 		</ResourceCompile>
 		<Link>
 			<AdditionalDependencies>AkTremoloFX.lib;AkMemoryMgr.lib;AkMotionGenerator.lib;AkSineSource.lib;AkStereoDelayFX.lib;AkGuitarDistortionFX.lib;AkRumble.lib;AkSoundEngine.lib;AkMP3Source.lib;AkRoomVerbFX.lib;AkParametricEQFX.lib;AkToneSource.lib;AkFlangerFX.lib;AkCompressorFX.lib;AkAudioInputSource.lib;AkMusicEngine.lib;AkDelayFX.lib;AkPitchShifterFX.lib;AkSilenceSource.lib;AkGainFX.lib;AkVorbisDecoder.lib;AkTimeStretchFX.lib;AkMatrixReverbFX.lib;AkMeterFX.lib;AkStreamMgr.lib;AkHarmonizerFX.lib;AkPeakLimiterFX.lib;AkExpanderFX.lib;dxguid.lib;ws2_32.lib;dinput8.lib;Dsound.lib;XInput.lib;Msacm32.lib;Dbghelp.lib;d3d9.lib;D3dx9.lib;Winmm.lib;CommunicationCentral.lib;%(AdditionalDependencies)</AdditionalDependencies>
 			<OutputFile>$(OutDir)IntegrationDemo.exe</OutputFile>
-			<AdditionalLibraryDirectories>&quot;$(DXSDK_DIR)\lib\x64&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+			<AdditionalLibraryDirectories>&quot;..\..\..\..\dxsdk(June2010)\lib\x64&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
 			<SubSystem>Windows</SubSystem>
 			<GenerateDebugInformation>true</GenerateDebugInformation>
 			<TargetMachine>MachineX64</TargetMachine>
@@ -279,7 +279,7 @@
 	</ItemDefinitionGroup>
 	<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug(StaticCRT)|Win32'">
 		<ClCompile>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 			<PreprocessorDefinitions>_DEBUG;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
 			<PrecompiledHeader>Use</PrecompiledHeader>
 			<PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
@@ -288,12 +288,12 @@
 		</ClCompile>
 		<ResourceCompile>
 			<PreprocessorDefinitions>_DEBUG;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 		</ResourceCompile>
 		<Link>
 			<AdditionalDependencies>AkTremoloFX.lib;AkMemoryMgr.lib;AkMotionGenerator.lib;AkSineSource.lib;AkStereoDelayFX.lib;AkGuitarDistortionFX.lib;AkRumble.lib;AkSoundEngine.lib;AkMP3Source.lib;AkRoomVerbFX.lib;AkParametricEQFX.lib;AkToneSource.lib;AkFlangerFX.lib;AkCompressorFX.lib;AkAudioInputSource.lib;AkMusicEngine.lib;AkDelayFX.lib;AkPitchShifterFX.lib;AkSilenceSource.lib;AkGainFX.lib;AkVorbisDecoder.lib;AkTimeStretchFX.lib;AkMatrixReverbFX.lib;AkMeterFX.lib;AkStreamMgr.lib;AkHarmonizerFX.lib;AkPeakLimiterFX.lib;AkExpanderFX.lib;dxguid.lib;ws2_32.lib;dinput8.lib;Dsound.lib;XInput.lib;Msacm32.lib;Dbghelp.lib;d3d9.lib;D3dx9.lib;Winmm.lib;CommunicationCentral.lib;%(AdditionalDependencies)</AdditionalDependencies>
 			<OutputFile>$(OutDir)IntegrationDemo.exe</OutputFile>
-			<AdditionalLibraryDirectories>&quot;$(DXSDK_DIR)\lib\x86&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+			<AdditionalLibraryDirectories>&quot;..\..\..\..\dxsdk(June2010)\lib\x86&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
 			<SubSystem>Windows</SubSystem>
 			<GenerateDebugInformation>true</GenerateDebugInformation>
 			<TargetMachine>MachineX86</TargetMachine>
@@ -301,7 +301,7 @@
 	</ItemDefinitionGroup>
 	<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug(StaticCRT)|x64'">
 		<ClCompile>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 			<PreprocessorDefinitions>_DEBUG;WIN64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
 			<PrecompiledHeader>Use</PrecompiledHeader>
 			<PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
@@ -310,12 +310,12 @@
 		</ClCompile>
 		<ResourceCompile>
 			<PreprocessorDefinitions>_DEBUG;WIN64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 		</ResourceCompile>
 		<Link>
 			<AdditionalDependencies>AkTremoloFX.lib;AkMemoryMgr.lib;AkMotionGenerator.lib;AkSineSource.lib;AkStereoDelayFX.lib;AkGuitarDistortionFX.lib;AkRumble.lib;AkSoundEngine.lib;AkMP3Source.lib;AkRoomVerbFX.lib;AkParametricEQFX.lib;AkToneSource.lib;AkFlangerFX.lib;AkCompressorFX.lib;AkAudioInputSource.lib;AkMusicEngine.lib;AkDelayFX.lib;AkPitchShifterFX.lib;AkSilenceSource.lib;AkGainFX.lib;AkVorbisDecoder.lib;AkTimeStretchFX.lib;AkMatrixReverbFX.lib;AkMeterFX.lib;AkStreamMgr.lib;AkHarmonizerFX.lib;AkPeakLimiterFX.lib;AkExpanderFX.lib;dxguid.lib;ws2_32.lib;dinput8.lib;Dsound.lib;XInput.lib;Msacm32.lib;Dbghelp.lib;d3d9.lib;D3dx9.lib;Winmm.lib;CommunicationCentral.lib;%(AdditionalDependencies)</AdditionalDependencies>
 			<OutputFile>$(OutDir)IntegrationDemo.exe</OutputFile>
-			<AdditionalLibraryDirectories>&quot;$(DXSDK_DIR)\lib\x64&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+			<AdditionalLibraryDirectories>&quot;..\..\..\..\dxsdk(June2010)\lib\x64&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
 			<SubSystem>Windows</SubSystem>
 			<GenerateDebugInformation>true</GenerateDebugInformation>
 			<TargetMachine>MachineX64</TargetMachine>
@@ -323,7 +323,7 @@
 	</ItemDefinitionGroup>
 	<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile|Win32'">
 		<ClCompile>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 			<PreprocessorDefinitions>NDEBUG;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
 			<PrecompiledHeader>Use</PrecompiledHeader>
 			<PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
@@ -332,12 +332,12 @@
 		</ClCompile>
 		<ResourceCompile>
 			<PreprocessorDefinitions>NDEBUG;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 		</ResourceCompile>
 		<Link>
 			<AdditionalDependencies>AkTremoloFX.lib;AkMemoryMgr.lib;AkMotionGenerator.lib;AkSineSource.lib;AkStereoDelayFX.lib;AkGuitarDistortionFX.lib;AkRumble.lib;AkSoundEngine.lib;AkMP3Source.lib;AkRoomVerbFX.lib;AkParametricEQFX.lib;AkToneSource.lib;AkFlangerFX.lib;AkCompressorFX.lib;AkAudioInputSource.lib;AkMusicEngine.lib;AkDelayFX.lib;AkPitchShifterFX.lib;AkSilenceSource.lib;AkGainFX.lib;AkVorbisDecoder.lib;AkTimeStretchFX.lib;AkMatrixReverbFX.lib;AkMeterFX.lib;AkStreamMgr.lib;AkHarmonizerFX.lib;AkPeakLimiterFX.lib;AkExpanderFX.lib;dxguid.lib;ws2_32.lib;dinput8.lib;Dsound.lib;XInput.lib;Msacm32.lib;Dbghelp.lib;d3d9.lib;D3dx9.lib;Winmm.lib;CommunicationCentral.lib;%(AdditionalDependencies)</AdditionalDependencies>
 			<OutputFile>$(OutDir)IntegrationDemo.exe</OutputFile>
-			<AdditionalLibraryDirectories>&quot;$(DXSDK_DIR)\lib\x86&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+			<AdditionalLibraryDirectories>&quot;..\..\..\..\dxsdk(June2010)\lib\x86&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
 			<SubSystem>Windows</SubSystem>
 			<GenerateDebugInformation>true</GenerateDebugInformation>
 			<TargetMachine>MachineX86</TargetMachine>
@@ -345,7 +345,7 @@
 	</ItemDefinitionGroup>
 	<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">
 		<ClCompile>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 			<PreprocessorDefinitions>NDEBUG;WIN64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
 			<PrecompiledHeader>Use</PrecompiledHeader>
 			<PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
@@ -354,12 +354,12 @@
 		</ClCompile>
 		<ResourceCompile>
 			<PreprocessorDefinitions>NDEBUG;WIN64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 		</ResourceCompile>
 		<Link>
 			<AdditionalDependencies>AkTremoloFX.lib;AkMemoryMgr.lib;AkMotionGenerator.lib;AkSineSource.lib;AkStereoDelayFX.lib;AkGuitarDistortionFX.lib;AkRumble.lib;AkSoundEngine.lib;AkMP3Source.lib;AkRoomVerbFX.lib;AkParametricEQFX.lib;AkToneSource.lib;AkFlangerFX.lib;AkCompressorFX.lib;AkAudioInputSource.lib;AkMusicEngine.lib;AkDelayFX.lib;AkPitchShifterFX.lib;AkSilenceSource.lib;AkGainFX.lib;AkVorbisDecoder.lib;AkTimeStretchFX.lib;AkMatrixReverbFX.lib;AkMeterFX.lib;AkStreamMgr.lib;AkHarmonizerFX.lib;AkPeakLimiterFX.lib;AkExpanderFX.lib;dxguid.lib;ws2_32.lib;dinput8.lib;Dsound.lib;XInput.lib;Msacm32.lib;Dbghelp.lib;d3d9.lib;D3dx9.lib;Winmm.lib;CommunicationCentral.lib;%(AdditionalDependencies)</AdditionalDependencies>
 			<OutputFile>$(OutDir)IntegrationDemo.exe</OutputFile>
-			<AdditionalLibraryDirectories>&quot;$(DXSDK_DIR)\lib\x64&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+			<AdditionalLibraryDirectories>&quot;..\..\..\..\dxsdk(June2010)\lib\x64&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
 			<SubSystem>Windows</SubSystem>
 			<GenerateDebugInformation>true</GenerateDebugInformation>
 			<TargetMachine>MachineX64</TargetMachine>
@@ -367,7 +367,7 @@
 	</ItemDefinitionGroup>
 	<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile(StaticCRT)|Win32'">
 		<ClCompile>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 			<PreprocessorDefinitions>NDEBUG;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
 			<PrecompiledHeader>Use</PrecompiledHeader>
 			<PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
@@ -376,12 +376,12 @@
 		</ClCompile>
 		<ResourceCompile>
 			<PreprocessorDefinitions>NDEBUG;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 		</ResourceCompile>
 		<Link>
 			<AdditionalDependencies>AkTremoloFX.lib;AkMemoryMgr.lib;AkMotionGenerator.lib;AkSineSource.lib;AkStereoDelayFX.lib;AkGuitarDistortionFX.lib;AkRumble.lib;AkSoundEngine.lib;AkMP3Source.lib;AkRoomVerbFX.lib;AkParametricEQFX.lib;AkToneSource.lib;AkFlangerFX.lib;AkCompressorFX.lib;AkAudioInputSource.lib;AkMusicEngine.lib;AkDelayFX.lib;AkPitchShifterFX.lib;AkSilenceSource.lib;AkGainFX.lib;AkVorbisDecoder.lib;AkTimeStretchFX.lib;AkMatrixReverbFX.lib;AkMeterFX.lib;AkStreamMgr.lib;AkHarmonizerFX.lib;AkPeakLimiterFX.lib;AkExpanderFX.lib;dxguid.lib;ws2_32.lib;dinput8.lib;Dsound.lib;XInput.lib;Msacm32.lib;Dbghelp.lib;d3d9.lib;D3dx9.lib;Winmm.lib;CommunicationCentral.lib;%(AdditionalDependencies)</AdditionalDependencies>
 			<OutputFile>$(OutDir)IntegrationDemo.exe</OutputFile>
-			<AdditionalLibraryDirectories>&quot;$(DXSDK_DIR)\lib\x86&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+			<AdditionalLibraryDirectories>&quot;..\..\..\..\dxsdk(June2010)\lib\x86&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
 			<SubSystem>Windows</SubSystem>
 			<GenerateDebugInformation>true</GenerateDebugInformation>
 			<TargetMachine>MachineX86</TargetMachine>
@@ -389,7 +389,7 @@
 	</ItemDefinitionGroup>
 	<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile(StaticCRT)|x64'">
 		<ClCompile>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 			<PreprocessorDefinitions>NDEBUG;WIN64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
 			<PrecompiledHeader>Use</PrecompiledHeader>
 			<PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
@@ -398,12 +398,12 @@
 		</ClCompile>
 		<ResourceCompile>
 			<PreprocessorDefinitions>NDEBUG;WIN64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 		</ResourceCompile>
 		<Link>
 			<AdditionalDependencies>AkTremoloFX.lib;AkMemoryMgr.lib;AkMotionGenerator.lib;AkSineSource.lib;AkStereoDelayFX.lib;AkGuitarDistortionFX.lib;AkRumble.lib;AkSoundEngine.lib;AkMP3Source.lib;AkRoomVerbFX.lib;AkParametricEQFX.lib;AkToneSource.lib;AkFlangerFX.lib;AkCompressorFX.lib;AkAudioInputSource.lib;AkMusicEngine.lib;AkDelayFX.lib;AkPitchShifterFX.lib;AkSilenceSource.lib;AkGainFX.lib;AkVorbisDecoder.lib;AkTimeStretchFX.lib;AkMatrixReverbFX.lib;AkMeterFX.lib;AkStreamMgr.lib;AkHarmonizerFX.lib;AkPeakLimiterFX.lib;AkExpanderFX.lib;dxguid.lib;ws2_32.lib;dinput8.lib;Dsound.lib;XInput.lib;Msacm32.lib;Dbghelp.lib;d3d9.lib;D3dx9.lib;Winmm.lib;CommunicationCentral.lib;%(AdditionalDependencies)</AdditionalDependencies>
 			<OutputFile>$(OutDir)IntegrationDemo.exe</OutputFile>
-			<AdditionalLibraryDirectories>&quot;$(DXSDK_DIR)\lib\x64&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+			<AdditionalLibraryDirectories>&quot;..\..\..\..\dxsdk(June2010)\lib\x64&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
 			<SubSystem>Windows</SubSystem>
 			<GenerateDebugInformation>true</GenerateDebugInformation>
 			<TargetMachine>MachineX64</TargetMachine>
@@ -411,7 +411,7 @@
 	</ItemDefinitionGroup>
 	<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
 		<ClCompile>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 			<PreprocessorDefinitions>NDEBUG;AK_OPTIMIZED;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
 			<PrecompiledHeader>Use</PrecompiledHeader>
 			<PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
@@ -420,12 +420,12 @@
 		</ClCompile>
 		<ResourceCompile>
 			<PreprocessorDefinitions>NDEBUG;AK_OPTIMIZED;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 		</ResourceCompile>
 		<Link>
 			<AdditionalDependencies>AkTremoloFX.lib;AkMemoryMgr.lib;AkMotionGenerator.lib;AkSineSource.lib;AkStereoDelayFX.lib;AkGuitarDistortionFX.lib;AkRumble.lib;AkSoundEngine.lib;AkMP3Source.lib;AkRoomVerbFX.lib;AkParametricEQFX.lib;AkToneSource.lib;AkFlangerFX.lib;AkCompressorFX.lib;AkAudioInputSource.lib;AkMusicEngine.lib;AkDelayFX.lib;AkPitchShifterFX.lib;AkSilenceSource.lib;AkGainFX.lib;AkVorbisDecoder.lib;AkTimeStretchFX.lib;AkMatrixReverbFX.lib;AkMeterFX.lib;AkStreamMgr.lib;AkHarmonizerFX.lib;AkPeakLimiterFX.lib;AkExpanderFX.lib;dxguid.lib;ws2_32.lib;dinput8.lib;Dsound.lib;XInput.lib;Msacm32.lib;Dbghelp.lib;d3d9.lib;D3dx9.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
 			<OutputFile>$(OutDir)IntegrationDemo.exe</OutputFile>
-			<AdditionalLibraryDirectories>&quot;$(DXSDK_DIR)\lib\x86&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+			<AdditionalLibraryDirectories>&quot;..\..\..\..\dxsdk(June2010)\lib\x86&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
 			<SubSystem>Windows</SubSystem>
 			<GenerateDebugInformation>true</GenerateDebugInformation>
 			<TargetMachine>MachineX86</TargetMachine>
@@ -433,7 +433,7 @@
 	</ItemDefinitionGroup>
 	<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
 		<ClCompile>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 			<PreprocessorDefinitions>NDEBUG;AK_OPTIMIZED;WIN64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
 			<PrecompiledHeader>Use</PrecompiledHeader>
 			<PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
@@ -442,12 +442,12 @@
 		</ClCompile>
 		<ResourceCompile>
 			<PreprocessorDefinitions>NDEBUG;AK_OPTIMIZED;WIN64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 		</ResourceCompile>
 		<Link>
 			<AdditionalDependencies>AkTremoloFX.lib;AkMemoryMgr.lib;AkMotionGenerator.lib;AkSineSource.lib;AkStereoDelayFX.lib;AkGuitarDistortionFX.lib;AkRumble.lib;AkSoundEngine.lib;AkMP3Source.lib;AkRoomVerbFX.lib;AkParametricEQFX.lib;AkToneSource.lib;AkFlangerFX.lib;AkCompressorFX.lib;AkAudioInputSource.lib;AkMusicEngine.lib;AkDelayFX.lib;AkPitchShifterFX.lib;AkSilenceSource.lib;AkGainFX.lib;AkVorbisDecoder.lib;AkTimeStretchFX.lib;AkMatrixReverbFX.lib;AkMeterFX.lib;AkStreamMgr.lib;AkHarmonizerFX.lib;AkPeakLimiterFX.lib;AkExpanderFX.lib;dxguid.lib;ws2_32.lib;dinput8.lib;Dsound.lib;XInput.lib;Msacm32.lib;Dbghelp.lib;d3d9.lib;D3dx9.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
 			<OutputFile>$(OutDir)IntegrationDemo.exe</OutputFile>
-			<AdditionalLibraryDirectories>&quot;$(DXSDK_DIR)\lib\x64&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+			<AdditionalLibraryDirectories>&quot;..\..\..\..\dxsdk(June2010)\lib\x64&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
 			<SubSystem>Windows</SubSystem>
 			<GenerateDebugInformation>true</GenerateDebugInformation>
 			<TargetMachine>MachineX64</TargetMachine>
@@ -455,7 +455,7 @@
 	</ItemDefinitionGroup>
 	<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release(StaticCRT)|Win32'">
 		<ClCompile>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 			<PreprocessorDefinitions>NDEBUG;AK_OPTIMIZED;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
 			<PrecompiledHeader>Use</PrecompiledHeader>
 			<PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
@@ -464,12 +464,12 @@
 		</ClCompile>
 		<ResourceCompile>
 			<PreprocessorDefinitions>NDEBUG;AK_OPTIMIZED;WIN32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 		</ResourceCompile>
 		<Link>
 			<AdditionalDependencies>AkTremoloFX.lib;AkMemoryMgr.lib;AkMotionGenerator.lib;AkSineSource.lib;AkStereoDelayFX.lib;AkGuitarDistortionFX.lib;AkRumble.lib;AkSoundEngine.lib;AkMP3Source.lib;AkRoomVerbFX.lib;AkParametricEQFX.lib;AkToneSource.lib;AkFlangerFX.lib;AkCompressorFX.lib;AkAudioInputSource.lib;AkMusicEngine.lib;AkDelayFX.lib;AkPitchShifterFX.lib;AkSilenceSource.lib;AkGainFX.lib;AkVorbisDecoder.lib;AkTimeStretchFX.lib;AkMatrixReverbFX.lib;AkMeterFX.lib;AkStreamMgr.lib;AkHarmonizerFX.lib;AkPeakLimiterFX.lib;AkExpanderFX.lib;dxguid.lib;ws2_32.lib;dinput8.lib;Dsound.lib;XInput.lib;Msacm32.lib;Dbghelp.lib;d3d9.lib;D3dx9.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
 			<OutputFile>$(OutDir)IntegrationDemo.exe</OutputFile>
-			<AdditionalLibraryDirectories>&quot;$(DXSDK_DIR)\lib\x86&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+			<AdditionalLibraryDirectories>&quot;..\..\..\..\dxsdk(June2010)\lib\x86&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
 			<SubSystem>Windows</SubSystem>
 			<GenerateDebugInformation>true</GenerateDebugInformation>
 			<TargetMachine>MachineX86</TargetMachine>
@@ -477,7 +477,7 @@
 	</ItemDefinitionGroup>
 	<ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release(StaticCRT)|x64'">
 		<ClCompile>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 			<PreprocessorDefinitions>NDEBUG;AK_OPTIMIZED;WIN64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
 			<PrecompiledHeader>Use</PrecompiledHeader>
 			<PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
@@ -486,12 +486,12 @@
 		</ClCompile>
 		<ResourceCompile>
 			<PreprocessorDefinitions>NDEBUG;AK_OPTIMIZED;WIN64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;$(DXSDK_DIR)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+			<AdditionalIncludeDirectories>..\..\..\include;..\..\SoundEngine\Common;..\..\SoundEngine\Win32;.;..\Common;..\MenuSystem;..\DemoPages;..\..\..\..\dxsdk(June2010)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
 		</ResourceCompile>
 		<Link>
 			<AdditionalDependencies>AkTremoloFX.lib;AkMemoryMgr.lib;AkMotionGenerator.lib;AkSineSource.lib;AkStereoDelayFX.lib;AkGuitarDistortionFX.lib;AkRumble.lib;AkSoundEngine.lib;AkMP3Source.lib;AkRoomVerbFX.lib;AkParametricEQFX.lib;AkToneSource.lib;AkFlangerFX.lib;AkCompressorFX.lib;AkAudioInputSource.lib;AkMusicEngine.lib;AkDelayFX.lib;AkPitchShifterFX.lib;AkSilenceSource.lib;AkGainFX.lib;AkVorbisDecoder.lib;AkTimeStretchFX.lib;AkMatrixReverbFX.lib;AkMeterFX.lib;AkStreamMgr.lib;AkHarmonizerFX.lib;AkPeakLimiterFX.lib;AkExpanderFX.lib;dxguid.lib;ws2_32.lib;dinput8.lib;Dsound.lib;XInput.lib;Msacm32.lib;Dbghelp.lib;d3d9.lib;D3dx9.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
 			<OutputFile>$(OutDir)IntegrationDemo.exe</OutputFile>
-			<AdditionalLibraryDirectories>&quot;$(DXSDK_DIR)\lib\x64&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+			<AdditionalLibraryDirectories>&quot;..\..\..\..\dxsdk(June2010)\lib\x64&quot;;..\..\..\$(Platform)_vc170\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
 			<SubSystem>Windows</SubSystem>
 			<GenerateDebugInformation>true</GenerateDebugInformation>
 			<TargetMachine>MachineX64</TargetMachine>
