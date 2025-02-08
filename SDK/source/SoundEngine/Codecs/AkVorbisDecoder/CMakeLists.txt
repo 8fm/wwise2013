@@ -18,13 +18,20 @@ set(SRC_FILES
     "Tremor/res012.cpp"
 )
 if (WIN32)
-    set(SYSTEM_INC "Win32")
+    set(SYSTEM_INC
+        "Win32"
+        "Tremor/Win32"
+        "../../AkAudiolib/Win32"
+    )
     list(APPEND SRC_FILES
         "Win32/AkVorbisCodec.cpp"
         "Tremor/Win32/codebook.cpp"
         "Tremor/Win32/dsp.cpp"
     )
 else()
+    set(SYSTEM_INC
+        "../../AkAudiolib/Linux"
+    )
     list(APPEND SRC_FILES
         "Tremor/FloatingPoint/AkVorbisCodec.cpp"
         "Tremor/FloatingPoint/codebook.cpp"
@@ -37,9 +44,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${SYSTEM_INC}
     "Common"
     "Tremor"
-    "Tremor/Win32"
     "Tremor/FloatingPoint"
-    "../../AkAudiolib/Win32"
     "../../AkAudiolib/SoftwarePipeline"
     "../../AkAudiolib/Common"
     "../../../../include"

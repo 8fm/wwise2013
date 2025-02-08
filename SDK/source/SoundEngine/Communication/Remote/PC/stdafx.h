@@ -18,6 +18,6 @@
 
 #include <AK/Tools/Common/AkAssert.h>
 
-#ifndef AK_APPLE
+#if !defined (AK_APPLE) && !defined(AK_LINUX)
 #include <winsock2.h>
 #endif

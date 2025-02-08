@@ -28,7 +28,7 @@
 #include <AK/SoundEngine/Common/IAkPlugin.h>
 #include <AK/Plugin/AkMotionGeneratorFactory.h>
 
-#include "..\..\..\..\AkAudioLib\Common\AkConversionTable.h"
+#include "../../../../AkAudiolib/Common/AkConversionTable.h"
 
 class AkCurve : public CAkConversionTable<AkRTPCGraphPoint, AkReal32>
 {

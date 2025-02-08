@@ -35,10 +35,6 @@
 #include "AkLEngineCmds.h"
 #include "AkVPL.h"
 
-#ifndef AK_USE_METRO_API
-#include <dbt.h>
-#endif
-
 class CAkFeedbackDeviceMgr;
 class CAkMMNotificationClient;
 

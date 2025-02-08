@@ -25,7 +25,7 @@
 #include "AkLEngineStructs.h"
 #include "AkFileParserBase.h"
 #include "AkCaptureMgr.h"
-#include "AudioLibDefs.h"
+#include "AudiolibDefs.h"
 
 #include "AkRuntimeEnvironmentMgr.h"
 #include <AK/Tools/Common/AkListBare.h>
