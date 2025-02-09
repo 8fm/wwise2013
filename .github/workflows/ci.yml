@@ -30,6 +30,32 @@ jobs:
         name: IntegrationDemo.${{ matrix.Configuration }}.${{ matrix.Platform }}.sln.ci-${{ github.run_number }}
         path: SDK/${{ matrix.Platform }}_vc170/${{ matrix.Configuration }}/bin/*.[ed][xl][el] # exe or dll
 
+  windows-cmake:
+    name: Windows cmake ${{ matrix.Configuration }} ${{ matrix.Platform }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        Configuration: [Debug, Profile, Final]
+        Platform: [x64]
+    steps:
+    - uses: actions/checkout@main
+      with:
+        submodules: recursive
+
+    - uses: ilammy/msvc-dev-cmd@v1
+    - name: Build
+      run: |
+        cd SDK
+        cmake --preset='ninja-${{ matrix.Configuration }}-${{ matrix.Platform }}'
+        cmake --build --preset='${{ matrix.Configuration }}-${{ matrix.Platform }}'
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@main
+      with:
+        name: IntegrationDemo.${{ matrix.Configuration }}.${{ matrix.Platform }}.cmake.ci-${{ github.run_number }}
+        path: SDK/Windows_${{ matrix.Platform }}/${{ matrix.Configuration }}/bin/*.exe
+
   linux-cmake:
     name: linux cmake ${{ matrix.CMake.Configuration }} ${{ matrix.Platform }}
     runs-on: ubuntu-24.04
