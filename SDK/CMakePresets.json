@@ -60,7 +60,7 @@
       "name": "Profile-x64",
       "displayName": "Profile x64",
       "configurePreset": "ninja-Profile-x64",
-      "configuration": "Profile"
+      "configuration": "RelWithDebInfo"
     },
     {
       "name": "Debug-x64",
