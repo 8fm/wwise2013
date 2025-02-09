@@ -35,10 +35,6 @@
 #include "AkLEngineCmds.h"
 #include "AkVPL.h"
 
-#ifndef AK_USE_METRO_API
-#include <dbt.h>
-#endif
-
 class CAkFeedbackDeviceMgr;
 class CAkMMNotificationClient;
 
@@ -65,24 +61,17 @@ public:
 	static void ResetAudioDevice();
 	static bool HasCoInitializeSucceeded() { return m_bCoInitializeSucceeded; }
 
-	static HANDLE GetProcessEvent() {return m_eventProcess;}
+	static AkEvent & GetProcessEvent() {return m_eventProcess;}
 
 private:
 	static AKRESULT ReplaceCurrentSink(CAkSink * in_pSink);
 	static void RegisterDeviceChange();
 	static void UnregisterDeviceChange();
-	static LRESULT CALLBACK InternalWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-	
+
 private: 
 	static bool					m_bCoInitializeSucceeded;	// Tell if the CoInitialized succeeded - then we need to coUninitialize
 	static bool					m_bResetAudioDevice;		// When set to true, sound engine will respawn a new sink
 
-#ifndef AK_USE_METRO_API
-	static WNDPROC				m_WndProc;					// The WndProc of the game.
-	static HDEVNOTIFY			m_hDevNotify;
-	static CAkMMNotificationClient * m_pMMNotifClient;
-#endif
-
-	static HANDLE m_eventProcess;
+	static AkEvent m_eventProcess;
 };
 #endif

@@ -206,9 +206,10 @@ if (WIN32)
     )
 else()
     set(STDAFX_H "Linux/stdafx.h")
-    set(SYSTEM_INC "Linux")
+    set(SYSTEM_INC "Linux" "POSIX")
     list(APPEND SRC_FILES
         "Linux/stdafx.cpp"
+        "POSIX/AkAudioThread.cpp"
     )
 endif()
 

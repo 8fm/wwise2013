@@ -33,7 +33,7 @@ GameSocket::~GameSocket()
 {
 }
 
-bool GameSocket::Create( AkInt32 in_type, AkInt32 in_protocol )
+bool GameSocket::Create( AkInt32 in_type, AkInt32 in_protocol, bool /*in_bRequiresAccumulator*/ )
 {
 	m_socket = ::socket( AF_INET, in_type, in_protocol );
 	int set = 1;
@@ -61,17 +61,6 @@ void GameSocket::NoDelay()
 {
 }
 
-bool GameSocket::NonBlocking() const
-{
-	int flags = fcntl(m_socket, F_GETFL, 0);
-#ifdef O_NONBLOCK
-	flags |= O_NONBLOCK;
-#else
-	flags |= SOCK_NONBLOCK;
-#endif
-	return fcntl(m_socket, F_SETFL, flags) == 0;
-}
-
 AkInt32 GameSocket::Connect( const GameSocketAddr& in_rAddr )
 {
 	return ::connect( m_socket, (sockaddr*)&in_rAddr.GetInternalType(), sizeof( in_rAddr.GetInternalType() ) );
@@ -87,12 +76,10 @@ AkInt32 GameSocket::Listen( AkInt32 in_backlog ) const
 	return ::listen( m_socket, in_backlog );
 }
 
-AkInt32 GameSocket::Accept( GameSocketAddr& out_rAddr, GameSocket & out_targetSocket )
+void GameSocket::Accept( GameSocketAddr& out_rAddr, GameSocket & out_targetSocket )
 {
 	int addrSize = sizeof( out_rAddr.GetInternalType() );
 	out_targetSocket.m_socket = ::accept( m_socket, (sockaddr*)&out_rAddr.GetInternalType(), (socklen_t*)&addrSize );
-
-	return out_targetSocket.IsValid() ? 0 : SOCKET_ERROR;
 }
 
 AkInt32 GameSocket::Send( const void* in_pBuf, AkInt32 in_length, AkInt32 in_flags ) const
@@ -120,11 +107,6 @@ AkInt32 GameSocket::Send( const void* in_pBuf, AkInt32 in_length, AkInt32 in_fla
 AkInt32 GameSocket::Recv( void* in_pBuf, AkInt32 in_length, AkInt32 in_flags ) const
 {
 	return (AkInt32) ::recv( m_socket, in_pBuf, in_length, in_flags);
-}
-
-AkInt32 GameSocket::RecvAll(void* in_pBuf, AkInt32 in_length, AkInt32 in_flags) const
-{
-	return Recv( in_pBuf, in_length, MSG_WAITALL);
 }
 
 AkInt32 GameSocket::SendTo( const void* in_pBuf, AkInt32 in_length, AkInt32 in_flags, const GameSocketAddr& in_rAddr ) const

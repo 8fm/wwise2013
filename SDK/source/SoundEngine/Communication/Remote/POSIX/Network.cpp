@@ -67,11 +67,6 @@ namespace Network
 		return htons( 12345 ) == 12345;
 	}
 
-	AkCommSettings::AkCommSystem GetCommunicationSystem()
-	{
-		return AK::Comm::GetCurrentSettings().commSystem;
-	}
-
 	bool IsDiscoverySystemEnabled()
 	{
 		return true;
