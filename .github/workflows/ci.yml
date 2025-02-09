@@ -29,3 +29,34 @@ jobs:
       with:
         name: IntegrationDemo.${{ matrix.Configuration }}.${{ matrix.Platform }}.sln.ci-${{ github.run_number }}
         path: SDK/${{ matrix.Platform }}_vc170/${{ matrix.Configuration }}/bin/*.[ed][xl][el] # exe or dll
+
+  linux-cmake:
+    name: linux cmake ${{ matrix.CMake.Configuration }} ${{ matrix.Platform }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        CMake:
+          - Configuration: Debug
+            BuildType: Debug
+          - Configuration: Profile
+            BuildType: Profile
+          - Configuration: Final
+            BuildType: Release
+        Platform: [x64]
+    steps:
+    - uses: actions/checkout@main
+      with:
+        submodules: recursive
+
+    - name: Install libs
+      run: |
+        sudo apt-get update
+        sudo apt-get install libsdl2-dev clang ninja-build
+    - name: Build
+      run: |
+        export CC=clang && export CXX=clang++
+        ${CXX} --version && cmake --version
+        cd SDK && mkdir build && cd build
+        cmake .. -G Ninja -DGAME_PLATFORM=${{ matrix.Platform }} -DGAME_CONFIG=${{ matrix.CMake.Configuration }} -DCMAKE_BUILD_TYPE=${{ matrix.CMake.BuildType }}
+        ninja
