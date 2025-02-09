@@ -1,11 +1,12 @@
 cmake_minimum_required(VERSION 3.18)
-project(IntegrationDemo)
+project(Wwise)
 
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
 endif()
 message("CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
+message("CMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME}")
 
 # GAME_CONFIG: Debug, Profile or Final
 if (NOT GAME_CONFIG)
@@ -20,11 +21,12 @@ endif()
 message("GAME_PLATFORM=${GAME_PLATFORM}")
 
 ### Set up output paths
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../../../Linux_${GAME_PLATFORM}/${GAME_CONFIG}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/${CMAKE_SYSTEM_NAME}_${GAME_PLATFORM}/${GAME_CONFIG}/bin)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
 ### Definitions
+add_definitions(-DAUDIOKINETIC -DAKSOUNDENGINE_EXPORTS -D_CRT_STDIO_ARBITRARY_WIDE_SPECIFIERS -D_CRT_SECURE_NO_WARNINGS -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NON_CONFORMING_SWPRINTFS -D_UNICODE -DUNICODE)
 if (${GAME_CONFIG} STREQUAL "Debug")
     add_definitions(-D_DEBUG)
 elseif (${GAME_CONFIG} STREQUAL "Profile")
@@ -48,6 +50,9 @@ endif()
 
 add_subdirectory(samples/Plugins/AkDelay/Sources/AudioEngineFX)
 add_subdirectory(samples/Plugins/AkAudioInput/Sources/AudioEngineFX)
+if (WIN32)
+add_subdirectory(samples/Plugins/AkMP3Source/Sources/AudioEngineFX)
+endif()
 add_subdirectory(samples/Plugins/AkSineTone/Sources/AudioEngineFX)
 add_subdirectory(samples/Plugins/AkToneGenerator/Sources/AudioEngineFX)
 if (WIN32)
@@ -56,7 +61,9 @@ endif()
 add_subdirectory(source/SoundEngine/AkMemoryMgr)
 add_subdirectory(source/SoundEngine/AkMusicEngine)
 add_subdirectory(source/SoundEngine/Codecs/AkVorbisDecoder)
-add_subdirectory(source/SoundEngine/Communication/Remote)
+if (NOT ${GAME_CONFIG} STREQUAL "Final") # CommunicationCentral
+    add_subdirectory(source/SoundEngine/Communication/Remote)
+endif()
 add_subdirectory(source/SoundEngine/Plugins/Effects/AkCompressor)
 add_subdirectory(source/SoundEngine/Plugins/Effects/AkExpander)
 add_subdirectory(source/SoundEngine/Plugins/Effects/AkFDNReverb)
@@ -78,3 +85,7 @@ add_subdirectory(source/SoundEngine/Plugins/Motion/Devices/Rumble)
 endif()
 add_subdirectory(source/SoundEngine/Plugins/Sources/AkSilenceSource)
 add_subdirectory(source/StreamManager)
+
+if (WIN32)
+add_subdirectory(samples/IntegrationDemo)
+endif()
