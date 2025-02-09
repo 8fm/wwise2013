@@ -14,6 +14,9 @@ if (WIN32)
 else()
     set(STDAFX_H "Linux/stdafx.h")
     set(SYSTEM_INC "Linux" "../AkAudiolib/Linux")
+    list(APPEND SRC_FILES
+        "Common/AkMemoryMgr.cpp"
+    )
 endif()
 
 add_library(${PROJECT_NAME} STATIC ${SRC_FILES})

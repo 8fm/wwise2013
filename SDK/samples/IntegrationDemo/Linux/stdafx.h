@@ -4,3 +4,5 @@
 
 #include <AK/SoundEngine/Common/AkTypes.h>
 #include <AK/Tools/Common/AkPlatformFuncs.h>
+
+#define INTEGRATIONDEMO_SRC_BUILD

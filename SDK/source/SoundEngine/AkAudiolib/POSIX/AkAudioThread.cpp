@@ -58,8 +58,8 @@ AK_DECLARE_THREAD_ROUTINE(CAkAudioThread::EventMgrThreadFunc)
 	// get our info from the parameter
 	CAkAudioThread* pAudioThread = AK_GET_THREAD_ROUTINE_PARAMETER_PTR( CAkAudioThread );
 
-	CAkLEngine::OnThreadStart();
-	
+	CAkLEngine::StartVoice();
+
 	AKASSERT( g_pAudioMgr );
 	do
     {
@@ -68,10 +68,7 @@ AK_DECLARE_THREAD_ROUTINE(CAkAudioThread::EventMgrThreadFunc)
 	}
 	while ( !pAudioThread->m_bStopThread );
 
-	CAkLEngine::OnThreadEnd();
-	
-	AK::MemoryMgr::TermForThread();
-    AkExitThread( AK_RETURN_THREAD_OK );
+	AkExitThread( AK_RETURN_THREAD_OK );
 }
 
 

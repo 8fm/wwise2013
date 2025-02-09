@@ -107,6 +107,8 @@ struct AkInitSettings
 
 	AkSinkType			eMainOutputType;			///< API used for audio output, default = AkSink_Main.
 	AkOutputSettings	settingsMainOutput;			///< Main output device settings.
+
+	bool				bUseLEngineThread;			///< Use a separate thread for processing audio. If set to false, audio processing will occur in RenderAudio(). Ignored on 3DS, Vita, Wii-U, and Xbox 360 platforms. \ref goingfurther_eventmgrthread
 };
 
 /// Audiokinetic namespace

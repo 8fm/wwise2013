@@ -32,34 +32,6 @@
 
 class CAkMergingSink;
 
-#define AK_XAUDIO2
-
-#ifndef AK_USE_METRO_API
-	#define AK_DIRECTSOUND
-#endif
-
-struct IDirectSound8;
-struct IXAudio2;
-
-namespace AK
-{
-	class IAkStdStream;
-};
-
-//----------------------------------------------------------------------------------------------------
-//----------------------------------------------------------------------------------------------------
-
-struct BufferUpdateParams
-{
-	AkUInt32	ulOffset;
-	AkUInt32	ulBytes;
-	void*		pvAudioPtr1;
-	AkUInt32	ulAudioBytes1;
-	void*		pvAudioPtr2;
-	AkUInt32	ulAudioBytes2;
-	AkUInt32	ulFlags;
-};
-
 //----------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------
 
@@ -81,7 +53,7 @@ public:
 
 	AkForceInline AkChannelMask GetSpeakerConfig() { return m_SpeakersConfig; }
 
-	virtual DWORD GetThreadWaitTime() = 0;
+	//virtual DWORD GetThreadWaitTime() = 0;
 	virtual bool IsStarved() = 0;
 	virtual void ResetStarved() = 0;
 
@@ -91,8 +63,8 @@ public:
 
 	virtual AKRESULT PassSilence() = 0;
 
-	virtual IXAudio2* GetWwiseXAudio2Interface() { return NULL; }
-	virtual IDirectSound8 * GetDirectSoundInstance() { return NULL; }
+	//virtual IXAudio2* GetWwiseXAudio2Interface() { return NULL; }
+	//virtual IDirectSound8 * GetDirectSoundInstance() { return NULL; }
 
 	void StartOutputCapture(const AkOSChar* in_CaptureFileName);
 	void StopOutputCapture();
@@ -140,8 +112,8 @@ protected:
 //----------------------------------------------------------------------------------------------------
 class CAkSinkDummy : public CAkSink
 {
-	DWORD m_Timer;
-	DWORD m_dwMSPerBuffer;
+//	DWORD m_Timer;
+//	DWORD m_dwMSPerBuffer;
 
 public:
 	CAkSinkDummy() : CAkSink( AkSink_Dummy) {};
@@ -154,7 +126,7 @@ public:
 	virtual AKRESULT Play();
 	virtual void Term();
 
-	virtual DWORD GetThreadWaitTime();
+	//virtual DWORD GetThreadWaitTime();
 	virtual bool IsStarved();
 	virtual void ResetStarved();
 

@@ -22,6 +22,8 @@ enum DrawStyle
 	DrawStyle_Title,	///< Page title text
 	DrawStyle_Error,	///< Error Message Text
 	DrawStyle_Text		///< Plain Text, smaller font
+
+	,DrawStyle_Num		///< Number of styles
 };
 
 
@@ -72,5 +74,5 @@ int GetLineHeight(
 /// Replaces tags by their platform-specific values
 void ReplaceTags( string& io_strTagString );
 
-unsigned long GetWindowWidth();
-unsigned long GetWindowHeight();
+AkUInt32 GetWindowWidth();
+AkUInt32 GetWindowHeight();

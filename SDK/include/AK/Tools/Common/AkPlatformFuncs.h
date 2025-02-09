@@ -76,6 +76,9 @@
 #define AkZeroMemSmall(___Dest, ___Size) AKPLATFORM::AkMemSet(___Dest, 0, ___Size);
 #endif
 
+#ifndef AK_THREAD_INIT_CODE
+#define AK_THREAD_INIT_CODE(_threadProperties)
+#endif
 
 #ifndef AK_PERF_RECORDING_RESET
 #define AK_PERF_RECORDING_RESET()
@@ -85,6 +88,14 @@
 #endif
 #ifndef AK_PERF_RECORDING_STOP
 #define AK_PERF_RECORDING_STOP( __StorageName__, __uExecutionCountStart__, __uExecutionCountStop__ )	
+#endif
+
+#ifndef AK_INSTRUMENT_BEGIN
+	#define AK_INSTRUMENT_BEGIN( _zone_name_ )
+	#define AK_INSTRUMENT_END( _zone_name_ )
+	#define AK_INSTRUMENT_SCOPE( _zone_name_ )
+
+	#define AK_INSTRUMENT_THREAD_START( _thread_name_ )
 #endif
 
 #endif // _AK_TOOLS_COMMON_AKPLATFORMFUNCS_H

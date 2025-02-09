@@ -533,10 +533,12 @@ namespace AK
 				AkCreateMotionGenerator,
 				AkCreateMotionGeneratorParams ) );
 
+#ifndef AK_LINUX
 			AK::MotionEngine::RegisterMotionDevice( 
 				AKCOMPANYID_AUDIOKINETIC, 
 				AKMOTIONDEVICEID_RUMBLE,
 				AkCreateRumblePlugin );
+#endif
 
 #endif
 

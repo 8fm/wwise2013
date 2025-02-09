@@ -16,18 +16,16 @@ set(SRC_FILES
     "../Common/ConsoleDiscoveryMessage.cpp"
     "../Common/IPConnectorPorts.cpp"
     "../Common/Serializer.cpp"
+    "PC/GameSocketAddr.cpp"
 )
 
 if (WIN32)
-#    set(SYSTEM_INC "Win32")
     list(APPEND SRC_FILES
         "PC/GameSocket.cpp"
-        "PC/GameSocketAddr.cpp"
         "PC/Network.cpp"
         "PC/stdafx.cpp"
     )
 else()
-#    set(SYSTEM_INC "Linux")
     list(APPEND SRC_FILES
         "POSIX/GameSocket.cpp"
         "POSIX/Network.cpp"

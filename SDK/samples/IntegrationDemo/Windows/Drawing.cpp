@@ -35,15 +35,15 @@ HWND			 g_hWnd;
 //  FUNCTIONS
 /////////////////////////
 
-static unsigned long g_iWidth;
-static unsigned long g_iHeight;
+static AkUInt32 g_iWidth;
+static AkUInt32 g_iHeight;
 
-unsigned long GetWindowWidth()
+AkUInt32 GetWindowWidth()
 {
 	return g_iWidth;
 }
 
-unsigned long GetWindowHeight()
+AkUInt32 GetWindowHeight()
 {
 	return g_iHeight;
 }

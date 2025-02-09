@@ -29,7 +29,6 @@ set(SRC_FILES
     "MenuSystem/Page.cpp"
     "MenuSystem/ToggleControl.cpp"
     "MenuSystem/UniversalInput.cpp"
-    "../SoundEngine/Win32/AkDefaultIOHookBlocking.cpp"
     "../SoundEngine/Common/AkFilePackage.cpp"
     "../SoundEngine/Common/AkFileLocationBase.cpp"
     "../SoundEngine/Common/AkFilePackageLUT.cpp"
@@ -42,7 +41,6 @@ set(INTEGRATION_LIBS
     AkSineSource
     AkStereoDelayFX
     AkGuitarDistortionFX
-    AkRumble
     AkSoundEngine
     AkRoomVerbFX
     AkParametricEQFX
@@ -77,6 +75,7 @@ if (WIN32)
         "../../../dxsdk(June2010)/Include"
     )
     list(APPEND SRC_FILES
+        "../SoundEngine/Win32/AkDefaultIOHookBlocking.cpp"
         "Windows/stdafx.cpp"
         "Windows/Drawing.cpp"
         "Windows/InputMgr.cpp"
@@ -87,6 +86,7 @@ if (WIN32)
     )
     list(APPEND INTEGRATION_LIBS
         AkMP3Source
+        AkRumble
         dxguid
         ws2_32
         dinput8
@@ -100,6 +100,19 @@ else()
     set(SYSTEM_INC
         "Linux"
         "../SoundEngine/POSIX"
+        "FreetypeRenderer"
+    )
+    list(APPEND SRC_FILES
+        "../SoundEngine/POSIX/AkDefaultIOHookBlocking.cpp"
+        "Linux/Drawing.cpp"
+        "Linux/InputMgr.cpp"
+        "Linux/Main.cpp"
+        "Linux/SoundInput.cpp"
+        "Linux/SoundInputMgr.cpp"
+        "FreetypeRenderer/FreetypeGraphicRenderer.cpp"
+    )
+    list(APPEND INTEGRATION_LIBS
+        SDL2
     )
 endif()
 
@@ -119,6 +132,10 @@ if (WIN32)
         "../../../dxsdk(June2010)/Lib/${GAME_PLATFORM}"
     )
     target_link_libraries(${PROJECT_NAME} ${INTEGRATION_LIBS})
+else()
+    target_link_libraries(${PROJECT_NAME}
+        "$<LINK_GROUP:RESCAN,${INTEGRATION_LIBS}>"
+    )
 endif()
 
 target_precompile_headers(${PROJECT_NAME}

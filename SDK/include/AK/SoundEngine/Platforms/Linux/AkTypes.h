@@ -45,6 +45,7 @@ the specific language governing permissions and limitations under the License.
 	#define AK_CPU_X86
 #endif
 
+#define AK_MOTION								///< Internal use
 #define AK_71AUDIO
 #define AK_LFECENTER
 #define AK_REARCHANNELS
