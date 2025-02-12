@@ -40,6 +40,9 @@ the specific language governing permissions and limitations under the License.
 #include <AK/SoundEngine/Common/AkTypes.h>
 
 //#include <sys/atomics.h>
+#if (defined(AK_CPU_X86_64) || defined(AK_CPU_X86))
+#include <cpuid.h>
+#endif
 #include <time.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -121,4 +124,56 @@ namespace AKPLATFORM
 
 	/// Stack allocations.
 	#define AkAlloca( _size_ ) __builtin_alloca( _size_ )
+
+#if (defined(AK_CPU_X86_64) || defined(AK_CPU_X86))
+	// Once our minimum compiler version supports __get_cpuid_count, these asm blocks can be replaced
+	#if defined(__i386__) && defined(__PIC__)
+		// %ebx may be the PIC register. 
+		#define __ak_cpuid_count(level, count, a, b, c, d)		\
+			__asm__ ("xchg{l}\t{%%}ebx, %k1\n\t"				\
+				"cpuid\n\t"										\
+				"xchg{l}\t{%%}ebx, %k1\n\t"						\
+				: "=a" (a), "=&r" (b), "=c" (c), "=d" (d)		\
+				: "0" (level), "2" (count))
+	#elif defined(__x86_64__) && defined(__PIC__)
+		// %rbx may be the PIC register. 
+		#define __ak_cpuid_count(level, count, a, b, c, d)		\
+			__asm__ ("xchg{q}\t{%%}rbx, %q1\n\t"				\
+				"cpuid\n\t"										\
+				"xchg{q}\t{%%}rbx, %q1\n\t"						\
+				: "=a" (a), "=&r" (b), "=c" (c), "=d" (d)		\
+				: "0" (level), "2" (count))
+	#else
+	#define __ak_cpuid_count(level, count, a, b, c, d)			\
+			__asm__ ("cpuid\n\t"								\
+				: "=a" (a), "=b" (b), "=c" (c), "=d" (d)		\
+				: "0" (level), "2" (count))
+	#endif
+	
+	static __inline int __ak_get_cpuid_count(unsigned int __leaf,
+		unsigned int __subleaf,
+		unsigned int *__eax, unsigned int *__ebx,
+		unsigned int *__ecx, unsigned int *__edx)
+	{
+		unsigned int __max_leaf = __get_cpuid_max(__leaf & 0x80000000, 0);
+
+		if (__max_leaf == 0 || __max_leaf < __leaf)
+			return 0;
+
+		__ak_cpuid_count(__leaf, __subleaf, *__eax, *__ebx, *__ecx, *__edx);
+		return 1;
+	}
+	
+	/// Support to fetch the CPUID for the platform. Only valid for X86 targets
+	/// \remark Note that IAkProcessorFeatures should be preferred to fetch this data
+	/// as it will have already translated the feature bits into AK-relevant enums
+	inline void CPUID(AkUInt32 in_uLeafOpcode, AkUInt32 in_uSubLeafOpcode, unsigned int out_uCPUFeatures[4])
+	{
+		__ak_get_cpuid_count( in_uLeafOpcode, in_uSubLeafOpcode,
+			&out_uCPUFeatures[0],
+			&out_uCPUFeatures[1],
+			&out_uCPUFeatures[2],
+			&out_uCPUFeatures[3]);
+	}
+#endif
 }

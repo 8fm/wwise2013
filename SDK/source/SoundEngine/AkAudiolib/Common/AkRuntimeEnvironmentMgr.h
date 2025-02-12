@@ -19,7 +19,6 @@ Copyright (c) 2006-2014 Audiokinetic Inc.
 
 namespace AK
 {
-#if !defined (AK_APPLE)	&& !defined(AK_LINUX)
 	struct AkProcessorSupportInfo
 	{
 		AkUInt32 uSIMDProcessorSupport;
@@ -33,7 +32,6 @@ namespace AK
 			uCacheLineSize = 0;
 		}
 	};
-#endif
 	
 	class AkRuntimeEnvironmentMgr : public IAkProcessorFeatures
 	{
@@ -48,9 +46,7 @@ namespace AK
 	protected:
 		AkRuntimeEnvironmentMgr();	
 		
-#if !defined (AK_APPLE) && !defined(AK_LINUX)
 		AkProcessorSupportInfo ProcessorInfo;	
-#endif		
 	};
 }
 
