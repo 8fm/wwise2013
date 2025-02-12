@@ -56,6 +56,7 @@
 
 #elif defined( AK_LINUX )
 #include <AK/SoundEngine/Platforms/Linux/AkLinuxSoundEngine.h>
+#include <AK/SoundEngine/Platforms/Linux/AkPlatformContext.h>
 
 #else
 #error AkSoundEngine.h: Undefined platform

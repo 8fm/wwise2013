@@ -30,6 +30,32 @@
 #define AK_SETPOOLNAME(_poolid,_name)
 #endif
 
+/// Memory category IDs.
+enum AkMemID
+{
+	AkMemID_Object,					///< Generic placeholder for allocations tied to the Wwise project.
+	AkMemID_Event,					///< Events from the Wwise project.
+	AkMemID_Structure,				///< Structures from the Wwise project.
+	AkMemID_Media,					///< Media from the Wwise project.
+	AkMemID_GameObject,				///< Game Objects and related.
+	AkMemID_Processing,				///< Anything tied to instancing and processing of the DSP graph.
+	AkMemID_ProcessingPlugin,		///< Plug-in allocations related to the DSP graph.
+	AkMemID_Streaming,				///< Streaming Manager objects.
+	AkMemID_StreamingIO,			///< Streaming Manager I/O memory.
+	AkMemID_SpatialAudio,			///< Spatial audio.
+	AkMemID_SpatialAudioGeometry,	///< Spatial audio geometry data.
+	AkMemID_SpatialAudioPaths,		///< Spatial audio paths data.
+	AkMemID_GameSim,				///< Game Simulator allocations.
+	AkMemID_MonitorQueue,			///< Monitor Queue.
+	AkMemID_Profiler,				///< Profiler.
+	AkMemID_FilePackage,			///< File packager.
+	AkMemID_SoundEngine,			///< Base sound engine allocations (managers, etc).
+
+	AkMemID_NUM,					///< Category count.
+	AkMemID_MASK = 0x7FFFFFFF,		///< Mask for category IDs.
+
+	AkMemType_Device = 0x80000000	///< Device memory type bit.
+};
 
 namespace AK
 {   

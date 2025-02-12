@@ -40,6 +40,17 @@ the specific language governing permissions and limitations under the License.
 #include <AK/SoundEngine/Common/AkTypes.h>
 #include <AK/Tools/Common/AkPlatformFuncs.h>
 
+///< API used for audio output
+///< Use with AkPlatformInitSettings to select the API used for audio output.  
+///< Use AkAPI_Default, it will select the more appropriate API depending on the computer's capabilities.  Other values should be used for testing purposes.
+///< \sa AK::SoundEngine::Init
+typedef enum AkAudioAPILinux
+{
+	AkAPI_PulseAudio = 1 << 0,						///< Use PulseAudio (this is the preferred API on Linux)
+	AkAPI_ALSA = 1 << 1,							///< Use ALSA
+	AkAPI_Default = AkAPI_PulseAudio | AkAPI_ALSA,	///< Default value, will select the more appropriate API
+} AkAudioAPI;
+
 ///< API used for audio output (PC only).
 enum AkSinkType
 {
@@ -69,6 +80,9 @@ struct AkPlatformInitSettings
 	//Voices.
 	AkUInt32			uSampleRate;			///< Sampling Rate. Default 48000 Hz
 	AkUInt16            uNumRefillsInVoice;		///< Number of refill buffers in voice buffer. 2 == double-buffered, defaults to 4.
+	AkAudioAPI			eAudioAPI;				///< Main audio API to use. Leave to AkAPI_Default for the default sink (default value).
+													///< If a valid audioDeviceShareset plug-in is provided, the AkAudioAPI will be Ignored.
+													///< \ref AkAudioAPI
 };
 
 ///< Used with \ref AK::SoundEngine::AddSecondaryOutput to specify the type of secondary output.

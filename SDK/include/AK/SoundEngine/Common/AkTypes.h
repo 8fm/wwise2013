@@ -171,6 +171,24 @@ enum AkGroupType
 	AkGroupType_State	= 1  ///< Type state
 };
 
+enum AkAudioDeviceState
+{
+	AkDeviceState_Unknown = 0,         ///< The audio device state is unknown or invalid.
+	AkDeviceState_Active = 1 << 0,	   ///< The audio device is active That is, the audio adapter that connects to the endpoint device is present and enabled.
+	AkDeviceState_Disabled = 1 << 1,   ///< The audio device is disabled.
+	AkDeviceState_NotPresent = 1 << 2, ///< The audio device is not present because the audio adapter that connects to the endpoint device has been removed from the system.
+	AkDeviceState_Unplugged = 1 << 3,  ///< The audio device is unplugged.
+	AkDeviceState_All = AkDeviceState_Active | AkDeviceState_Disabled | AkDeviceState_NotPresent | AkDeviceState_Unplugged, ///< Includes audio devices in all states.
+};
+
+struct AkDeviceDescription
+{
+	AkUInt32 idDevice;											///< Device ID for Wwise. This is the same as what is returned from AK::GetDeviceID and AK::GetDeviceIDFromName. Use it to specify the main device in AkPlatformInitSettings.idAudioDevice or in AK::SoundEngine::AddSecondaryOutput. 
+	AkOSChar deviceName[AK_MAX_PATH];							///< The user-friendly name for the device.
+	AkAudioDeviceState deviceStateMask = AkDeviceState_Unknown;	///< Bitmask used to filter the device based on their state.
+	bool isDefaultDevice = false;								///< Identify default device. Always false when not supported.
+};
+
 /// This structure allows the game to provide audio files to fill the external sources. See \ref AK::SoundEngine::PostEvent
 /// You can specify a streaming file or a file in-memory, regardless of the "Stream" option in the Wwise project.  
 /// \akwarning

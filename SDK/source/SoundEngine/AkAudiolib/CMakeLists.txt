@@ -210,6 +210,8 @@ else()
     list(APPEND SRC_FILES
         "Linux/stdafx.cpp"
         "POSIX/AkAudioThread.cpp"
+        "Linux/AkLEngine.cpp"
+        "Linux/PulseAudioAPI.cpp"
     )
 endif()
 

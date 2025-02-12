@@ -185,4 +185,17 @@ typedef AkUInt64		AkOutputDeviceID;			///< Audio Output device ID
 // Bus ducking.
 #define AK_DEFAULT_MAX_BUS_DUCKING				(-96.3f)	// Arbitrary. Should be -INF.
 
+// Built-in plugin ID.  These are persisted, do not change the order or the numbers!
+enum AkBuiltInSinks
+{
+	AKPLUGINID_DEFAULT_SINK = 174,
+	AKPLUGINID_DVR_SINK,			//DVR output on XB1, PS4
+	AKPLUGINID_COMMUNICATION_SINK,	//Chat on XB1, PS4, Windows, Stadia
+	AKPLUGINID_PERSONAL_SINK,		//Controller Headset on XB1 or PS4
+	AKPLUGINID_VOICE_SINK,			//OBSOLETE
+	AKPLUGINID_PAD_SINK,			//Controller Speaker on PS4.
+	AKPLUGINID_AUX_SINK,
+	AKPLUGINID_DUMMY_SINK
+};
+
 #endif // _AKPRIVATETYPES_H

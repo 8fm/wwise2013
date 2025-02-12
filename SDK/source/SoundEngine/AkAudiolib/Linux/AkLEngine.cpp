@@ -190,50 +190,25 @@ public:
 	PulseAudioAPI::SinkInfo sinkInfoList[PULSE_AUDIO_MAX_NB_DEVICES];
 };
 
-namespace AK
-{
-	namespace SoundEngine
-	{
-		AKRESULT RegisterPluginDLL(const AkOSChar* in_DllName, const AkOSChar* in_DllPath /* = NULL */)
-		{
-			//Find the DLL path from Android			
-			AkOSChar fullName[1024];
-			fullName[0] = 0;
-			CAkLEngine::GetPluginDLLFullPath(fullName, 1024, in_DllName, in_DllPath);
-
-			void *hLib = dlopen(fullName, RTLD_NOW | RTLD_DEEPBIND); //RTLD_DEEPBIND force local symbol to be check first then global
-			if (hLib == NULL)
-				return AK_FileNotFound;
-			
-			AK::PluginRegistration** RegisterList = (AK::PluginRegistration**)dlsym(hLib, "g_pAKPluginList");
-			if (RegisterList == NULL)
-				return AK_InvalidFile;
-			
-			return CAkEffectsMgr::RegisterPluginList(*RegisterList);
-		}
-
-		AKRESULT GetDeviceSpatialAudioSupport(AkUInt32 in_idDevice)
-		{
-			return AK_NotCompatible;
-		}
-	}
-};
-
-
 void CAkLEngine::GetDefaultPlatformInitSettings( 
 	AkPlatformInitSettings &      out_pPlatformSettings      // Platform specific settings. Can be changed depending on hardware.
 	)
 {
 	memset( &out_pPlatformSettings, 0, sizeof( AkPlatformInitSettings ) );
-
-	GetDefaultPlatformThreadInitSettings(out_pPlatformSettings);
-
+	out_pPlatformSettings.threadLEngine.nPriority = AK_THREAD_PRIORITY_ABOVE_NORMAL;
+	out_pPlatformSettings.threadLEngine.uStackSize = AK_DEFAULT_STACK_SIZE;
+	out_pPlatformSettings.threadBankManager.nPriority = AK_THREAD_BANK_MANAGER_PRIORITY;
+	out_pPlatformSettings.threadBankManager.uStackSize = AK_BANK_MGR_THREAD_STACK_BYTES;
+	out_pPlatformSettings.uLEngineDefaultPoolSize = LENGINE_DEFAULT_POOL_SIZE;
+	out_pPlatformSettings.fLEngineDefaultPoolRatioThreshold = 1.0f; // 1.0f == means 100% == disabled by default
 	out_pPlatformSettings.uNumRefillsInVoice = AK_DEFAULT_NUM_REFILLS_IN_VOICE_BUFFER;
 	out_pPlatformSettings.uSampleRate = DEFAULT_NATIVE_FREQUENCY;
-	out_pPlatformSettings.sampleType = AK_DEFAULT_SAMPLE_TYPE;
+	out_pPlatformSettings.threadMonitor.nPriority = AK_THREAD_PRIORITY_ABOVE_NORMAL;
+	out_pPlatformSettings.threadMonitor.uStackSize = AK_DEFAULT_STACK_SIZE;
+	out_pPlatformSettings.threadMonitor.uSchedPolicy = AK_THREAD_DEFAULT_SCHED_POLICY;
 }
 
-void CAkLEngine::GetDefaultOutputSettings( AkOutputSettings & out_settings )
+void CAkLEngine::GetDefaultOutputSettings( AkSinkType in_eSinkType, AkOutputSettings & out_settings )
 {
 	GetDefaultOutputSettingsCommon(out_settings);
 }
@@ -260,6 +235,7 @@ void CAkLEngine::PlatformWaitForHwVoices()
 //-----------------------------------------------------------------------------
 AKRESULT CAkLEngine::Init()
 {
+/*
 	if (g_PDSettings.sampleType != AK_INT && g_PDSettings.sampleType != AK_FLOAT)
 	{
 		AkOSChar msg[256];
@@ -274,6 +250,7 @@ AKRESULT CAkLEngine::Init()
 	}
 
 	AkAudioLibSettings::SetAudioBufferSettings(g_PDSettings.uSampleRate, g_settings.uNumSamplesPerFrame);
+*/
 	return SoftwareInit();
 } // Init
 
@@ -290,6 +267,20 @@ void CAkLEngine::Term()
 	SoftwareTerm();
 } // Term
 
+AkUInt32 CAkLEngine::GetNumBufferNeededAndSubmit()
+{
+	AkUInt32 uBuffersNeeded = 0;
+
+	AKRESULT eResult = g_pAkSink->IsDataNeeded( uBuffersNeeded );
+	if ( eResult != AK_Success )
+	{
+		AKASSERT( false );
+	}
+
+	//nothing to submit, simply return num buffers
+	return uBuffersNeeded;
+}
+
 void CAkLEngine::TermPlatformContext()
 {
 	AkDelete(AkMemID_SoundEngine, m_pPlatformContext);
@@ -302,7 +293,7 @@ void CAkLEngine::TermPlatformContext()
 //-----------------------------------------------------------------------------
 void CAkLEngine::Perform()
 {
-	WWISE_SCOPED_PROFILE_MARKER( "CAkLEngine::Perform" );
+	//WWISE_SCOPED_PROFILE_MARKER( "CAkLEngine::Perform" );
 
 #if defined(AK_CPU_X86) || defined(AK_CPU_X86_64)
 	// Avoid denormal problems in audio processing
@@ -317,6 +308,10 @@ void CAkLEngine::Perform()
 #endif
 } // Perform
 
+void CAkLEngine::StartVoice()
+{
+	g_pAkSink->Play();
+}
 
 //-----------------------------------------------------------------------------
 // Implementation of GetDeviceList for PulseAudio

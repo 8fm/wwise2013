@@ -58,20 +58,23 @@ class CAkLEngine
 	#include "AkLEngine_SoftwarePipeline_incl.h"
 
 public:
-	static void ResetAudioDevice();
-	static bool HasCoInitializeSucceeded() { return m_bCoInitializeSucceeded; }
-
-	static AkEvent & GetProcessEvent() {return m_eventProcess;}
+	// Platform functions for hw voice processing
+	static bool PlatformSupportsHwVoices();
+	static void PlatformWaitForHwVoices();
+	// Returns all audio output devices for a platform built-in sinks
+	// Should handle all plug-ins in AkBuiltInSinks, except AKPLUGINID_DUMMY_SINK.
+	// Should return AK_NotCompatible if the platform does not support the sink plug-in.
+	// Should return AK_NotImplemented if only the default id is supported for now.
+	static AKRESULT GetPlatformDeviceList(
+		AkPluginID in_pluginID,
+		AkUInt32& io_maxNumDevices,					///< In: The maximum number of devices to read. Must match the memory allocated for AkDeviceDescription. Out: Returns the number of devices. Pass out_deviceDescriptions as NULL to have an idea of how many devices to expect.
+		AkDeviceDescription* out_deviceDescriptions	///< The output array of device descriptions, one per device. Must be preallocated by the user with a size of at least io_maxNumDevices*sizeof(AkDeviceDescription).
+	);
+	static void GetPluginDLLFullPath(AkOSChar* out_DllFullPath, AkUInt32 in_MaxPathLength, const AkOSChar* in_DllName, const AkOSChar* in_DllPath = NULL);
 
 private:
-	static AKRESULT ReplaceCurrentSink(CAkSink * in_pSink);
-	static void RegisterDeviceChange();
-	static void UnregisterDeviceChange();
-
-private: 
-	static bool					m_bCoInitializeSucceeded;	// Tell if the CoInitialized succeeded - then we need to coUninitialize
-	static bool					m_bResetAudioDevice;		// When set to true, sound engine will respawn a new sink
-
-	static AkEvent m_eventProcess;
+	static AK::IAkPlatformContext* m_pPlatformContext;
+	static AKRESULT InitPlatformContext();
+	static void TermPlatformContext();
 };
 #endif
